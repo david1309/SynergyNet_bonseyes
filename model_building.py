@@ -46,6 +46,10 @@ class SynergyNet(nn.Module):
 		super(SynergyNet, self).__init__()
 		
 		self.bfm = MorphabelModel('bfm_utils/morphable_models/BFM.mat')
+		# Store the base in a tensor type
+		self.shapeMU = torch.tensor(self.bfm.model['shapeMU']).reshape(3,-1,self.bfm.model['shapeMU'].shape[-1]).permute(1,2,0)[self.bfm.kpt_ind].cuda()
+		self.shapePC = torch.tensor(self.bfm.model['shapePC']).reshape(3,-1,self.bfm.model['shapePC'].shape[-1]).permute(1,2,0)[self.bfm.kpt_ind].cuda()
+		self.expPC = torch.tensor(self.bfm.model['expPC']).reshape(3,-1,self.bfm.model['expPC'].shape[-1]).permute(1,2,0)[self.bfm.kpt_ind].cuda()
 		self.img_size = args.img_size
 
 		# Image-to-parameter
@@ -68,24 +72,47 @@ class SynergyNet(nn.Module):
 			'loss_Param_S1S2': 0.0,
 			}
 
+	def angle2matrix_3ddfa(self, angles):
+		x, y, z = angles[:, 0], angles[:, 1], angles[:, 2]
+		tensor_0 = torch.zeros_like(x).cuda()
+		tensor_1 = tensor_0 + 1
+        
+		# x
+		Rx=torch.stack([
+					torch.stack([tensor_1,      tensor_0,      tensor_0]),
+                    torch.stack([tensor_0,  torch.cos(x),  torch.sin(x)]),
+                    torch.stack([tensor_0, -torch.sin(x),  torch.cos(x)])]).permute(2, 0, 1)
+        # y
+		Ry=torch.stack([
+					torch.stack([torch.cos(y), tensor_0, -torch.sin(y)]),
+                    torch.stack([    tensor_0, tensor_1,      tensor_0]),
+                    torch.stack([torch.sin(y), tensor_0, torch.cos(y)])]).permute(2, 0, 1)
+        # z
+		Rz=torch.stack([
+					torch.stack([ torch.cos(z),  torch.sin(z), tensor_0]),
+                    torch.stack([-torch.sin(z),  torch.cos(z), tensor_0]),
+                    torch.stack([     tensor_0,      tensor_0, tensor_1])]).permute(2, 0, 1)
+		R = torch.bmm(Rx, Ry)
+		R = torch.bmm(R,  Rz)
+		return R
+
+
 	def lm_from_params(self, pose_para, shape_para, exp_para):
 		# Get parameters
 		# TODO: move BFM's parameters
-		pose_para = pose_para.detach().cpu().numpy()
-		shape_para = shape_para.detach().cpu().numpy()
-		exp_para = exp_para.detach().cpu().numpy()
+		#pose_para = pose_para.detach().cpu().numpy()
+		#shape_para = shape_para.detach().cpu().numpy()
+		#exp_para = exp_para.detach().cpu().numpy()
 		s = pose_para[:, -1, 0]  # Scale
 		angles = pose_para[:, :3, 0]  # Rotation angles
 		t = pose_para[:, 3:6, 0]  # Translation
 
 		# Generate vertices + apply transforms (rotation, translation, scaling)
-		vertices = self.bfm.generate_vertices(shape_para, exp_para)
-		transformed_vertices = self.bfm.transform_3ddfa(vertices, s, angles, t)
-		image_vertices = transformed_vertices.copy()
-		image_vertices[:, 1] = self.img_size - image_vertices[:, 1] + 1  # transform to image coordinate space 
+		vertices = self.shapeMU.permute(1,0,2) + (shape_para[...,0] @ self.shapePC + exp_para[...,0] @ self.expPC).permute(1,0,2)
+		R = self.angle2matrix_3ddfa(angles)
 
 		# Get the 68 - 3d landmarks
-		landmarks3d = image_vertices[self.bfm.kpt_ind]
+		landmarks3d = s.unsqueeze(-1).unsqueeze(-1)*torch.bmm(vertices, R) + t.unsqueeze(1)
 
 		return landmarks3d.transpose()
 

@@ -29,7 +29,7 @@ args = None # define the static training setting, which wouldn't and shouldn't b
 
 def parse_args():
     parser = argparse.ArgumentParser(description='3DMM Fitting')
-    parser.add_argument('--datatool_path', type=str)
+    parser.add_argument('--datatool-path', type=str)
 
     parser.add_argument('-j', '--workers', default=4, type=int)
     parser.add_argument('--epochs', default=40, type=int)
@@ -131,7 +131,7 @@ def train(train_loader, model, optimizer, epoch, lr):
     # AverageMeter for statistics
     batch_time = AverageMeter()
     data_time = AverageMeter()
-    losses_name = list(model.module.get_losses())
+    losses_name = list(model.get_losses())
     losses_name.append('loss_total')
     losses_meter = [AverageMeter() for i in range(len(losses_name))]
 
@@ -195,7 +195,7 @@ def main():
     model = SynergyNet(args)
     torch.cuda.set_device(args.devices_id[0])
 
-    model = nn.DataParallel(model, device_ids=args.devices_id).cuda()  # -> GPU
+    model = model.cuda() #nn.DataParallel(model, device_ids=args.devices_id).cuda()  # -> GPU
 
     # step2: optimization: loss and optimization method
 
