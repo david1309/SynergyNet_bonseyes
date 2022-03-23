@@ -24,9 +24,6 @@ from torchvision.transforms import transforms, Normalize
 from PIL import Image
 import os
 from pathlib import Path
-import sys
-import inspect
-
 
 from data.datatool_api.config.APIConfig import DTAPIConfig
 from data.custom_dataset_model import DTDatasetCustom
@@ -122,27 +119,35 @@ class PTDataset300WLP(Dataset):
         return len(self.usable_annotations)
 
     def __getitem__(self, index):
-        # Get the annotation for the index
         annot_id = self.usable_annotations[index]
         annotation = self.dataset.annotations.get(annot_id)
+
+        # Landmarks 
         lm3d = annotation.face_landmarks_3d
         bb2d = annotation.face_bounding_box_2d
-        shape_params = np.array(annotation.shape_params)
-        exp_params = np.array(annotation.exp_params)
+
+        # Morphable parameters
+        shape_params = torch.Tensor(annotation.shape_params)
+        exp_params = torch.Tensor(annotation.exp_params)
         head_pose_ = annotation.head_pose
-        head_pose = np.array([head_pose_.yaw, head_pose_.pitch, head_pose_.roll])
-        model_input_size = self.kwargs['model_input_size']
-
-        # Adjust morphable model params
-
+        deg2rad = (np.pi / 90)
+        head_pose = [
+            head_pose_.roll * deg2rad,
+            head_pose_.pitch * deg2rad, 
+            head_pose_.yaw * deg2rad,
+        ]
+        head_translation = annotation.head_translation
+        head_scale = [annotation.head_scale]
+        pose_params = torch.Tensor([head_pose + head_translation + head_scale]).squeeze()
 
         # Adjust landmark values for new coordinate system of cropped image
         lm3d_temp = np.empty(shape=(3, annotation.count_face_landmarks_3d))
+        model_input_size = self.kwargs['model_input_size']
         for i, lm in enumerate(lm3d):
             lm3d_temp[0,i] = (lm.x - bb2d.topX) * model_input_size[0] / bb2d.w
             lm3d_temp[1,i] = (lm.y - bb2d.topY) * model_input_size[1] / bb2d.h
             lm3d_temp[2,i] = lm.z
-        lm3d = lm3d_temp
+        lm3d = torch.from_numpy(lm3d_temp)
 
         # Read image for the sample and Apply transforms
         image_name = annotation.id_image + '.jpg'
@@ -176,42 +181,42 @@ class PTDataset300WLP(Dataset):
 
         target = {
             "lm3d" : lm3d,
+            "pose_params" : pose_params,
             "shape_params" : shape_params,
             "exp_params" : exp_params,
-            "head_pose" : head_pose,
         }
         return img, target
 
 
 
-def main():
-    params = {
-        'model_input_size': (450, 450),  # Width x Height of input tensor for the model
-        'min_landmark_count': 68,  # Min number of landmarks 
-        'shape_param_size': 199,
-        'expression_param_size': 29
-    }
+# def main():
+#     params = {
+#         'model_input_size': (450, 450),  # Width x Height of input tensor for the model
+#         'min_landmark_count': 68,  # Min number of landmarks 
+#         'shape_param_size': 199,
+#         'expression_param_size': 29
+#     }
 
-    data_dir = '/hdd1/datasets/300W_LP/output_debug/IBUG'
+#     data_dir = '/hdd1/datasets/300W_LP/output_debug/IBUG'
 
-    # Create dataset instance
-    normalize = Normalize(
-        mean=[0.498, 0.498, 0.498], 
-        std=[0.229, 0.229, 0.229]
-        )
-    add_transforms = [normalize]
+#     # Create dataset instance
+#     normalize = Normalize(
+#         mean=[0.498, 0.498, 0.498], 
+#         std=[0.229, 0.229, 0.229]
+#         )
+#     add_transforms = [normalize]
 
-    dataset = PTDataset300WLP(
-        data_dir=data_dir, 
-        operating_mode='memory', 
-        add_transforms=add_transforms,
-        **params
-        )
+#     dataset = PTDataset300WLP(
+#         data_dir=data_dir, 
+#         operating_mode='memory', 
+#         add_transforms=add_transforms,
+#         **params
+#         )
 
-    # Test it
-    for i in range(len(dataset)):
-        img, target = dataset.__getitem__(i)
+#     # Test it
+#     for i in range(len(dataset)):
+#         img, target = dataset.__getitem__(i)
 
 
-if __name__ == main():
-    main()
+# if __name__ == main():
+#     main()

@@ -13,13 +13,15 @@ import torch.nn as nn
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 import torch.backends.cudnn as cudnn
-cudnn.benchmark=True
+# cudnn.benchmark=True  # TODO
 
 from utils.ddfa import DDFADataset, ToTensor, Normalize, SGD_NanHandler, CenterCrop, Compose_GT, ColorJitter
 from utils.ddfa import str2bool, AverageMeter
 from utils.io import mkdir
 from model_building import SynergyNet as SynergyNet
-from benchmark_validate import benchmark_pipeline
+# from benchmark_validate import benchmark_pipeline
+
+from dataloader_300wlp import PTDataset300WLP
 
 
 # global args (configuration)
@@ -27,7 +29,9 @@ args = None # define the static training setting, which wouldn't and shouldn't b
 
 def parse_args():
     parser = argparse.ArgumentParser(description='3DMM Fitting')
-    parser.add_argument('-j', '--workers', default=6, type=int)
+    parser.add_argument('--datatool_path', type=str)
+
+    parser.add_argument('-j', '--workers', default=4, type=int)
     parser.add_argument('--epochs', default=40, type=int)
     parser.add_argument('--start-epoch', default=1, type=int)
     parser.add_argument('-b', '--batch-size', default=128, type=int)
@@ -40,7 +44,6 @@ def parse_args():
     parser.add_argument('--resume', default='', type=str, metavar='PATH')
     parser.add_argument('--resume_pose', default='', type=str, metavar='PATH')
     parser.add_argument('--devices-id', default='0,1', type=str)
-    parser.add_argument('--filelists-train',default='', type=str)
     parser.add_argument('--root', default='')
     parser.add_argument('--snapshot', default='', type=str)
     parser.add_argument('--log-file', default='output.log', type=str)
@@ -50,8 +53,7 @@ def parse_args():
     parser.add_argument('--task', default='all', type=str)
     parser.add_argument('--test_initial', default='false', type=str2bool)
     parser.add_argument('--warmup', default=-1, type=int)
-    parser.add_argument('--param-fp-train',default='',type=str)
-    parser.add_argument('--img_size', default=120, type=int)
+    parser.add_argument('--img_size', default=450, type=int)
     parser.add_argument('--save_val_freq', default=10, type=int)
 
     global args
@@ -100,6 +102,29 @@ def save_checkpoint(state, filename='checkpoint.pth.tar'):
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
+ 
+def dataset_from_datatool(datatool_path, add_transforms=[]):
+    params = {
+        'model_input_size': (450, 450),  # Width x Height of input tensor for the model
+        'min_landmark_count': 68,  # Min number of landmarks 
+        'shape_param_size': 199,
+        'expression_param_size': 29
+    }
+    dataset = PTDataset300WLP(
+        data_dir=datatool_path, 
+        operating_mode='memory', 
+        add_transforms=add_transforms,
+        **params
+        )
+
+    return dataset
+
+def parse_target_to_cuda(target):
+    for key in target.keys():
+        target[key].requires_grad = False  
+        target[key] = target[key].float().cuda(non_blocking=True)
+    return target
+
 def train(train_loader, model, optimizer, epoch, lr):
     """Network training, loss updates, and backward calculation"""
 
@@ -116,10 +141,7 @@ def train(train_loader, model, optimizer, epoch, lr):
     for i, (input, target) in enumerate(train_loader):
 
         input = input.cuda(non_blocking=True)
-
-        target = target[:,:62]
-        target.requires_grad = False  
-        target = target.float().cuda(non_blocking=True)
+        target = parse_target_to_cuda(target)
         
         losses = model(input, target)
 
@@ -194,27 +216,23 @@ def main():
             logging.info(f'=> no checkpoint found at {args.resume}')
 
     # step3: data
-    normalize = Normalize(mean=127.5, std=128)
-
-    train_dataset = DDFADataset(
-        root=args.root,
-        filelists=args.filelists_train,
-        param_fp=args.param_fp_train,
-        gt_transform=True,
-        transform=Compose_GT([ColorJitter(0.4,0.4,0.4), ToTensor(), CenterCrop(5), normalize]) #
-    )
-
+    # normalize = Normalize(
+    #     mean=[0.498, 0.498, 0.498], 
+    #     std=[0.229, 0.229, 0.229]
+    #     )
+    # add_transforms = [normalize]
+    add_transforms = []
+    train_dataset = dataset_from_datatool(args.datatool_path, add_transforms)
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.workers,
                               shuffle=True, pin_memory=True, drop_last=True)
 
     
     # step4: run
-    cudnn.benchmark = True
-    if args.test_initial: # if testing the performance from the initial
-        logging.info('Testing from initial')
-        benchmark_pipeline(model)
+    # cudnn.benchmark = True  # TODO
+    # if args.test_initial: # if testing the performance from the initial
+    #     logging.info('Testing from initial')
+    #     benchmark_pipeline(model)  # TODO
         
-
     for epoch in range(args.start_epoch, args.epochs + 1):
         # adjust learning rate
         lr = adjust_learning_rate(optimizer, epoch, args.milestones)
@@ -232,8 +250,8 @@ def main():
                 },
                 filename
             )
-            logging.info('\nVal[{}]'.format(epoch))
-            benchmark_pipeline(model)
+            # logging.info('\nVal[{}]'.format(epoch))
+            # benchmark_pipeline(model) # TODO
 
 if __name__ == '__main__':
     main()

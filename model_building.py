@@ -6,7 +6,7 @@ import scipy.io as sio
 
 # All data parameters import
 from utils.params import ParamsPack
-param_pack = ParamsPack()
+# param_pack = ParamsPack()
 
 from backbone_nets import resnet_backbone
 from backbone_nets import mobilenetv1_backbone
@@ -15,16 +15,7 @@ from backbone_nets import ghostnet_backbone
 from backbone_nets.pointnet_backbone import MLP_for, MLP_rev
 from loss_definition import ParamLoss, WingLoss
 
-import time
-
-def parse_param_62(param):
-	"""Work for only tensor"""
-	p_ = param[:, :12].reshape(-1, 3, 4)
-	p = p_[:, :, :3]
-	offset = p_[:, :, -1].reshape(-1, 3, 1)
-	alpha_shp = param[:, 12:52].reshape(-1, 40, 1)
-	alpha_exp = param[:, 52:62].reshape(-1, 10, 1)
-	return p, offset, alpha_shp, alpha_exp
+from bfm_utils.morphabel_model import MorphabelModel
 
 # Image-to-parameter
 class I2P(nn.Module):
@@ -43,106 +34,100 @@ class I2P(nn.Module):
 		else:
 			raise RuntimeError("Please choose [mobilenet_v2, mobilenet_1, resnet50, or ghostnet]")
 
-	def forward(self,input, target):
+	def forward(self,input):
 		"""Training time forward"""
 		_3D_attr, avgpool = self.backbone(input)
-		_3D_attr_GT = target.type(torch.cuda.FloatTensor)
-		return _3D_attr, _3D_attr_GT, avgpool
-
-	def forward_test(self, input):
-		""" Testing time forward."""
-		_3D_attr, avgpool = self.backbone(input)
 		return _3D_attr, avgpool
+
 
 # Main model SynergyNet definition
 class SynergyNet(nn.Module):
 	def __init__(self, args):
 		super(SynergyNet, self).__init__()
-		self.triangles = sio.loadmat('./3dmm_data/tri.mat')['tri'] -1
-		self.triangles = torch.Tensor(self.triangles.astype(np.int)).long().cuda()
+		
+		self.bfm = MorphabelModel('bfm_utils/morphable_models/BFM.mat')
 		self.img_size = args.img_size
+
 		# Image-to-parameter
 		self.I2P = I2P(args)
+
 		# Forward
 		self.forwardDirection = MLP_for(68)
+
 		# Reverse
 		self.reverseDirection = MLP_rev(68)
+
+		# Losses
 		self.LMKLoss_3D = WingLoss()
 		self.ParamLoss = ParamLoss()
+		self.loss = {
+			'loss_LMK_f0': 0.0,
+			'loss_LMK_pointNet': 0.0,
+			'loss_Param_In': 0.0,
+			'loss_Param_S2': 0.0,
+			'loss_Param_S1S2': 0.0,
+			}
+
+	def lm_from_params(self, pose_para, shape_para, exp_para):
+		# Get parameters
+		# TODO: move BFM's parameters
+		pose_para = pose_para.detach().cpu().numpy()
+		shape_para = shape_para.detach().cpu().numpy()
+		exp_para = exp_para.detach().cpu().numpy()
+		s = pose_para[:, -1, 0]  # Scale
+		angles = pose_para[:, :3, 0]  # Rotation angles
+		t = pose_para[:, 3:6, 0]  # Translation
+
+		# Generate vertices + apply transforms (rotation, translation, scaling)
+		vertices = self.bfm.generate_vertices(shape_para, exp_para)
+		transformed_vertices = self.bfm.transform_3ddfa(vertices, s, angles, t)
+		image_vertices = transformed_vertices.copy()
+		image_vertices[:, 1] = self.img_size - image_vertices[:, 1] + 1  # transform to image coordinate space 
+
+		# Get the 68 - 3d landmarks
+		landmarks3d = image_vertices[self.bfm.kpt_ind]
+
+		return landmarks3d.transpose()
+
+	@staticmethod
+	def parse_target_params(target):
+		pose = target["pose_params"]
+		shape = target["shape_params"]
+		exp = target["exp_params"]
+
+		return torch.cat((pose, shape, exp), 1).type(torch.cuda.FloatTensor)
+	
+	@staticmethod
+	def parse_pred_params(pred):
+		"""
+		num_pose= 7,
+        num_shape = 199,
+        num_exp = 29,
+		"""
+		pose_para = pred[:, 0:7].reshape(-1, 7, 1)
+		shape_para = pred[:, 7: 199+7].reshape(-1, 199, 1)
+		exp_para = pred[:, 199+7: 199+7+29].reshape(-1, 29, 1)
+
+		return pose_para, shape_para, exp_para
 		
-		self.loss = {'loss_LMK_f0':0.0,
-					'loss_LMK_pointNet': 0.0,
-					'loss_Param_In':0.0,
-					'loss_Param_S2': 0.0,
-					'loss_Param_S1S2': 0.0,
-					}
-
-		self.register_buffer('param_mean', torch.Tensor(param_pack.param_mean).cuda(non_blocking=True))
-		self.register_buffer('param_std', torch.Tensor(param_pack.param_std).cuda(non_blocking=True))
-		self.register_buffer('w_shp', torch.Tensor(param_pack.w_shp).cuda(non_blocking=True))
-		self.register_buffer('u', torch.Tensor(param_pack.u).cuda(non_blocking=True))
-		self.register_buffer('w_exp', torch.Tensor(param_pack.w_exp).cuda(non_blocking=True))
-
-		# If doing only offline evaluation, use these
-		# self.u_base = torch.Tensor(param_pack.u_base).cuda(non_blocking=True)
-		# self.w_shp_base = torch.Tensor(param_pack.w_shp_base).cuda(non_blocking=True)
-		# self.w_exp_base = torch.Tensor(param_pack.w_exp_base).cuda(non_blocking=True)
-
-		# Online training needs these to parallel
-		self.register_buffer('u_base', torch.Tensor(param_pack.u_base).cuda(non_blocking=True))
-		self.register_buffer('w_shp_base', torch.Tensor(param_pack.w_shp_base).cuda(non_blocking=True))
-		self.register_buffer('w_exp_base', torch.Tensor(param_pack.w_exp_base).cuda(non_blocking=True))
-		self.keypoints = torch.Tensor(param_pack.keypoints).long()
- 
-		self.data_param = [self.param_mean, self.param_std, self.w_shp_base, self.u_base, self.w_exp_base]
-
-	def reconstruct_vertex_62(self, param, whitening=True, dense=False, transform=True, lmk_pts=68):
-		"""
-		Whitening param -> 3d vertex, based on the 3dmm param: u_base, w_shp, w_exp
-		dense: if True, return dense vertex, else return 68 sparse landmarks. All dense or sparse vertex is transformed to
-		image coordinate space, but without alignment caused by face cropping.
-		transform: whether transform to image space
-		Working with batched tensors. Using Fortan-type reshape.
-		"""
-
-		if whitening:
-			if param.shape[1] == 62:
-				param_ = param * self.param_std[:62] + self.param_mean[:62]
-			else:
-				raise RuntimeError('length of params mismatch')
-
-		p, offset, alpha_shp, alpha_exp = parse_param_62(param_)
-
-		if dense:
-			
-			vertex = p @ (self.u + self.w_shp @ alpha_shp + self.w_exp @ alpha_exp).contiguous().view(-1, 53215, 3).transpose(1,2) + offset
-			
-			if transform: 
-				# transform to image coordinate space
-				vertex[:, 1, :] = param_pack.std_size + 1 - vertex[:, 1, :]
-
-		else:
-			"""For 68 pts"""
-			vertex = p @ (self.u_base + self.w_shp_base @ alpha_shp + self.w_exp_base @ alpha_exp).contiguous().view(-1, lmk_pts, 3).transpose(1,2) + offset
-
-			if transform: 
-				# transform to image coordinate space
-				vertex[:, 1, :] = param_pack.std_size + 1 - vertex[:, 1, :]
-
-		return vertex
-
 	def forward(self, input, target):
-		_3D_attr, _3D_attr_GT, avgpool = self.I2P(input, target)
-			
-		vertex_lmk = self.reconstruct_vertex_62(_3D_attr, dense=False)
-		vertex_GT_lmk = self.reconstruct_vertex_62(_3D_attr_GT, dense=False)
-		self.loss['loss_LMK_f0'] = 0.05 *self.LMKLoss_3D(vertex_lmk, vertex_GT_lmk, kp=True)		
+		# Image to 3DMM Parameters
+		_3D_attr, avgpool = self.I2P(input)
+		_3D_attr_GT = self.parse_target_params(target)
+		pose_para, shape_para, exp_para = self.parse_pred_params(_3D_attr)
+		vertex_lmk = self.lm_from_params(pose_para, shape_para, exp_para)  # Coarse landamrks: Lc
+		vertex_GT_lmk = target["lm3d"]
+		vertex_GT_lmk_2 = self.lm_from_params(target["pose_para"], target["shape_para"], target["exp_para"])
+
+		self.loss['loss_LMK_f0'] = 0.05 * self.LMKLoss_3D(vertex_lmk, vertex_GT_lmk)		
 		self.loss['loss_Param_In'] = 0.02 * self.ParamLoss(_3D_attr, _3D_attr_GT)
+		
+		# Coarse landmarks to Refined landmarks
+		point_residual = self.forwardDirection(vertex_lmk, avgpool, shape_para, exp_para)  # _3D_attr[:, 7: 199+7], _3D_attr[:, 199+7: 199+7+29])
+		vertex_lmk = vertex_lmk + 0.05 * point_residual  # Refined landmarks: Lr = Lc + 0.05 * L_residual
+		self.loss['loss_LMK_pointNet'] = 0.05 * self.LMKLoss_3D(vertex_lmk, vertex_GT_lmk)
 
-		point_residual = self.forwardDirection(vertex_lmk, avgpool, _3D_attr[:,12:52], _3D_attr[:,52:62])
-		vertex_lmk = vertex_lmk + 0.05 * point_residual
-		self.loss['loss_LMK_pointNet'] = 0.05 * self.LMKLoss_3D(vertex_lmk, vertex_GT_lmk, kp=True)
-
+		# Refined landmarks to 3DMM parameters
 		_3D_attr_S2 = self.reverseDirection(vertex_lmk)
 		self.loss['loss_Param_S2'] = 0.02 * self.ParamLoss(_3D_attr_S2, _3D_attr_GT, mode='only_3dmm')
 		self.loss['loss_Param_S1S2'] = 0.001 * self.ParamLoss(_3D_attr_S2, _3D_attr, mode='only_3dmm')

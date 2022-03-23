@@ -31,7 +31,11 @@ class ParamsPack():
 			self.u_base = self.u[self.keypoints].reshape(-1, 1)
 			self.w_shp_base = self.w_shp[self.keypoints]
 			self.w_exp_base = self.w_exp[self.keypoints]
-			self.std_size = 120
+			
+			# TODO
 			self.dim = self.w_shp.shape[0] // 3
+
+			# !DONE
+			self.std_size = 120
 		except:
 			raise RuntimeError('Missing data')
