@@ -11,9 +11,9 @@ class WingLoss(nn.Module):
         self.log_term = math.log(1 + self.omega / self.epsilon)
 
     def forward(self, pred, target):
-        n_points = pred.shape[2]
-        pred = pred.transpose(1,2).contiguous().view(-1, 3*n_points)
-        target = target.transpose(1,2).contiguous().view(-1, 3*n_points)
+        n_points = pred.shape[1]
+        pred = pred.contiguous().view(-1, 3*n_points)
+        target = target.contiguous().view(-1, 3*n_points)
         y = target
         y_hat = pred
         delta_y = (y - y_hat).abs()

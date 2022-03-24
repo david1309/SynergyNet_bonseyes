@@ -12,7 +12,7 @@ class MLP_for(nn.Module):
 		self.conv3 = torch.nn.Conv1d(64,64,1)
 		self.conv4 = torch.nn.Conv1d(64,128,1)
 		self.conv5 = torch.nn.Conv1d(128,1024,1)
-		self.conv6 = nn.Conv1d(2418, 512, 1) # 1024 + 64 + 1280 = 2368
+		self.conv6 = nn.Conv1d(2596, 512, 1) 
 		self.conv7 = nn.Conv1d(512, 256, 1)
 		self.conv8 = nn.Conv1d(256, 128, 1)
 		self.conv9 = nn.Conv1d(128, 3, 1)
@@ -29,6 +29,7 @@ class MLP_for(nn.Module):
 		self.max_pool = nn.MaxPool1d(num_pts)
 		
 	def forward(self,x, other_input1=None, other_input2=None, other_input3=None):
+		x = x.permute(0, 2, 1)
 		out = F.relu(self.bn1(self.conv1(x)))
 		out = F.relu(self.bn2(self.conv2(out)))
 		point_features = out
@@ -50,10 +51,10 @@ class MLP_for(nn.Module):
 		avgpool = avgpool.unsqueeze(2).repeat(1,1,self.num_pts)
 		
 		shape_code = other_input2
-		shape_code = shape_code.unsqueeze(2).repeat(1,1,self.num_pts)
+		shape_code = shape_code.repeat(1,1,self.num_pts)
 
 		expr_code = other_input3
-		expr_code = expr_code.unsqueeze(2).repeat(1,1,self.num_pts)
+		expr_code = expr_code.repeat(1,1,self.num_pts)
 
 		out = F.relu(self.bn6(self.conv6(torch.cat([point_features, global_features_repeated, avgpool, shape_code, expr_code],1))))
 
@@ -61,7 +62,7 @@ class MLP_for(nn.Module):
 		out = F.relu(self.bn7(self.conv7(out)))
 		out = F.relu(self.bn8(self.conv8(out)))
 		out = F.relu(self.bn9(self.conv9(out)))
-		return out
+		return out.permute(0, 2, 1)
 
 
 class MLP_rev(nn.Module):
@@ -88,6 +89,7 @@ class MLP_rev(nn.Module):
 		self.max_pool = nn.MaxPool1d(num_pts)
 
 	def forward(self,x, other_input1=None, other_input2=None, other_input3=None):
+		x = x.permute(0, 2, 1)
 		out = F.relu(self.bn1(self.conv1(x)))
 		out = F.relu(self.bn2(self.conv2(out)))
 		out = F.relu(self.bn3(self.conv3(out)))

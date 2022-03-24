@@ -114,7 +114,7 @@ class SynergyNet(nn.Module):
 		# Get the 68 - 3d landmarks
 		landmarks3d = s.unsqueeze(-1).unsqueeze(-1)*torch.bmm(vertices, R) + t.unsqueeze(1)
 
-		return landmarks3d.transpose()
+		return landmarks3d
 
 	@staticmethod
 	def parse_target_params(target):
@@ -143,8 +143,7 @@ class SynergyNet(nn.Module):
 		_3D_attr_GT = self.parse_target_params(target)
 		pose_para, shape_para, exp_para = self.parse_pred_params(_3D_attr)
 		vertex_lmk = self.lm_from_params(pose_para, shape_para, exp_para)  # Coarse landamrks: Lc
-		vertex_GT_lmk = target["lm3d"]
-		vertex_GT_lmk_2 = self.lm_from_params(target["pose_para"], target["shape_para"], target["exp_para"])
+		vertex_GT_lmk = target["lm3d"].permute(0, 2, 1)
 
 		self.loss['loss_LMK_f0'] = 0.05 * self.LMKLoss_3D(vertex_lmk, vertex_GT_lmk)		
 		self.loss['loss_Param_In'] = 0.02 * self.ParamLoss(_3D_attr, _3D_attr_GT)
