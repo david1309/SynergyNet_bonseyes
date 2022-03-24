@@ -156,7 +156,7 @@ class SynergyNet(nn.Module):
 		
 		# Coarse landmarks to Refined landmarks
 		point_residual = self.forwardDirection(vertex_lmk, avgpool, shape_para, exp_para)  # _3D_attr[:, 7: 199+7], _3D_attr[:, 199+7: 199+7+29])
-		vertex_lmk = vertex_lmk + 0.5 * point_residual  # Refined landmarks: Lr = Lc + 0.5 * L_residual
+		vertex_lmk = vertex_lmk + point_residual  # Refined landmarks: Lr = Lc + L_residual
 		self.loss['loss_LMK_pointNet'] = 0.05 * self.LMKLoss_3D(vertex_lmk, vertex_GT_lmk)
 
 		# Refined landmarks to 3DMM parameters

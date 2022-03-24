@@ -61,7 +61,7 @@ class MLP_for(nn.Module):
 
 		out = F.relu(self.bn7(self.conv7(out)))
 		out = F.relu(self.bn8(self.conv8(out)))
-		out = F.relu(self.bn9(self.conv9(out)))
+		out = self.bn9(self.conv9(out))
 		return out.permute(0, 2, 1)
 
 

@@ -22,6 +22,7 @@ from model_building import SynergyNet as SynergyNet
 # from benchmark_validate import benchmark_pipeline
 
 from dataloader_300wlp import PTDataset300WLP
+from torch.utils.tensorboard import SummaryWriter
 
 
 # global args (configuration)
@@ -125,7 +126,7 @@ def parse_target_to_cuda(target):
         target[key] = target[key].float().cuda(non_blocking=True)
     return target
 
-def train(train_loader, model, optimizer, epoch, lr):
+def train(train_loader, model, optimizer, epoch, lr, writer):
     """Network training, loss updates, and backward calculation"""
 
     # AverageMeter for statistics
@@ -173,6 +174,8 @@ def train(train_loader, model, optimizer, epoch, lr):
             for k in range(len(losses_meter)):
                 msg += '{}: {:.4f} ({:.4f})\t'.format(losses_name[k], losses_meter[k].val, losses_meter[k].avg)
             logging.info(msg)
+            for k in range(len(losses_meter)):
+                writer.add_scalar('TrainLoss/' + losses_name[k], losses_meter[k].val, epoch*len(train_loader) + i)
 
 
 def main():
@@ -232,13 +235,14 @@ def main():
     # if args.test_initial: # if testing the performance from the initial
     #     logging.info('Testing from initial')
     #     benchmark_pipeline(model)  # TODO
-        
+    writer = SummaryWriter()
+
     for epoch in range(args.start_epoch, args.epochs + 1):
         # adjust learning rate
         lr = adjust_learning_rate(optimizer, epoch, args.milestones)
 
         # train for one epoch
-        train(train_loader, model, optimizer, epoch, lr)
+        train(train_loader, model, optimizer, epoch, lr, writer)
 
         filename = f'{args.snapshot}_checkpoint_epoch_{epoch}.pth.tar'
         # save checkpoints and current model validation

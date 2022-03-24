@@ -6,6 +6,7 @@ ckpts/
 .idea
 .DS_Store
 .vscode/*
+runs/*
 __pycache__
 venv
 *.tar
