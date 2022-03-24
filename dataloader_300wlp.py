@@ -54,7 +54,8 @@ def plot_sample(img, face_lm_2d, bbox, saving_path=None):
 class PTDataset300WLP(Dataset):
     def __init__(
         self, 
-        data_dir: str, 
+        data_root_dir: str, 
+        tags: list,
         add_transforms: list = [],
         operating_mode: str = 'memory', 
         **kwargs
@@ -62,50 +63,58 @@ class PTDataset300WLP(Dataset):
         """
         Instantiate the dataset instance
 
-        :param data_dir: Directory containing the datatool output which contains
-        the "sample_files" directory and "dataset.json" file
+        :param data_root_dir: Root Directory containing all the tags produced
+        by the datatool
+
+        :param tags: Name of each subfolder (tag), each one containing the 
+        "sample_files" directory and "dataset.json" file
+
         :param operating_mode: Operating mode for the datatool api to handle
         the dataset, based on the data size, user can choose
         [memory, disk or ramdisk]
+
         :param kwargs: Additional keyword arguments
         """
         Dataset.__init__(self)
-        self.data_dir = data_dir
-        self.operating_mode = operating_mode
+        self.data_root_dir = data_root_dir
+        self.tags = tags
         self.kwargs = kwargs
 
         # No need to validate when loading back the API output
         DTAPIConfig.disable_validation()
 
-        # Load the dataset.json using the datatool API
-        _dataset = DTDatasetCustom(
-            name='300w_lp_dataset',
-            operatingMode=self.operating_mode
-            )
-        self.dataset = _dataset.load_from_json(
-            os.path.join(self.data_dir,'dataset.json'),
-            element_list=['images', 'annotations']
-            )
-
-        # Diltered list validating if annotations requirements are met
+        # Load the dataset.json for each tag
+        self.annotations = {}
         self.usable_annotations = []
-        for annot_id, annotation in self.dataset.annotations.items():
-            flags = []
-            flags.append(
-                annotation.count_face_landmarks_2d == self.kwargs['min_landmark_count']
+        for tag in tags:
+            _dataset = DTDatasetCustom(
+                name=f'300w_lp_dataset_{tag}',
+                operatingMode=operating_mode
                 )
-            flags.append(
-                annotation.count_face_landmarks_3d == self.kwargs['min_landmark_count']
-            )
-            flags.append(
-                len(annotation.shape_params) == self.kwargs['shape_param_size']
-            )
-            flags.append(
-                len(annotation.exp_params) == self.kwargs['expression_param_size']
-            )
+            dataset = _dataset.load_from_json(
+                os.path.join(self.data_root_dir, tag, 'dataset.json'),
+                element_list=['annotations']
+                )
 
-            if all(flags):
-                self.usable_annotations.append(annot_id)
+            # Filtered list validating if annotations requirements are met
+            for annot_id, annotation in dataset.annotations.items():
+                flags = []
+                flags.append(
+                    annotation.count_face_landmarks_2d == self.kwargs['min_landmark_count']
+                    )
+                flags.append(
+                    annotation.count_face_landmarks_3d == self.kwargs['min_landmark_count']
+                )
+                flags.append(
+                    len(annotation.shape_params) == self.kwargs['shape_param_size']
+                )
+                flags.append(
+                    len(annotation.exp_params) == self.kwargs['expression_param_size']
+                )
+
+                if all(flags):
+                    self.usable_annotations.append(annot_id)
+                    self.annotations[annot_id] = annotation
 
         # Set of transforms
         base_transforms = [
@@ -120,27 +129,17 @@ class PTDataset300WLP(Dataset):
 
     def __getitem__(self, index):
         annot_id = self.usable_annotations[index]
-        annotation = self.dataset.annotations.get(annot_id)
+        annotation = self.annotations.get(annot_id)
         model_input_size = self.kwargs['model_input_size']
 
         # Landmarks 
         lm3d = annotation.face_landmarks_3d
         bb2d = annotation.face_bounding_box_2d
 
-        # Transform bb2d to have squared images
-        # max_dim = max(bb2d.w,bb2d.h)
-        # if max_dim==bb2d.w:
-        #     diff = max_dim - bb2d.h
-        #     bb2d.topY -= diff/2.0
-        #     bb2d.h = bb2d.w
-        # else:
-        #     diff = max_dim - bb2d.w
-        #     bb2d.topX -= diff/2.0
-        #     bb2d.w = bb2d.h 
+        # Morphable parameters (normalized by 1e7, 10, image height, and 100)
+        shape_params = torch.Tensor(annotation.shape_params) / 1e7
+        exp_params = torch.Tensor(annotation.exp_params) / 10
 
-        # Morphable parameters
-        shape_params = torch.Tensor(annotation.shape_params)/1e7
-        exp_params = torch.Tensor(annotation.exp_params)/10
         head_pose_ = annotation.head_pose
         deg2rad = (np.pi / 90)
         head_pose = [
@@ -149,16 +148,11 @@ class PTDataset300WLP(Dataset):
             head_pose_.yaw * deg2rad,
         ]
         head_translation = annotation.head_translation
-        head_translation = [x/model_input_size[0] for x in head_translation]
-        head_scale = [annotation.head_scale*100]
-
-        # Transform respect the cropping
-        # head_scale[0] *= model_input_size[0] / bb2d.w
-        # head_translation[0] = (head_translation[0] - bb2d.topX) * model_input_size[0] / bb2d.w
-        # head_translation[1] = (head_translation[1] - bb2d.topY) * model_input_size[1] / bb2d.h
+        head_translation = [t / model_input_size[0] for t in head_translation]
+        head_scale = [annotation.head_scale * 100]
         pose_params = torch.Tensor([head_pose + head_translation + head_scale]).squeeze()
 
-        # Adjust landmark values for new coordinate system of cropped image
+        # Obtain Tensor for 3D landmarks
         lm3d_temp = np.empty(shape=(3, annotation.count_face_landmarks_3d))
         for i, lm in enumerate(lm3d):
             lm3d_temp[0,i] = lm.x #(lm.x - bb2d.topX) * model_input_size[0] / bb2d.w
@@ -168,37 +162,9 @@ class PTDataset300WLP(Dataset):
 
         # Read image for the sample and Apply transforms
         image_name = annotation.id_image + '.jpg'
-        img = Image.open(os.path.join(self.data_dir, 'sample_files', image_name))
-        orig_height = img.height
-
-        # Elaborate the new pose params
-        pose_params[-1]
-
-        bbox = [
-            bb2d.topX, 
-            bb2d.topY,
-            bb2d.w,
-            bb2d.h
-        ]
-
-        # base_path = "example_dataloaders/sample_imgs"
-        # Path(base_path).mkdir(parents=True, exist_ok=True)
-        # saving_path =  annotation.id_image + "_ori" + '.jpg'
-        # plot_sample(img, lm3d, bbox, saving_path=os.path.join(base_path, saving_path))
-        # img_ = np.array(img)     
-        # print((img_.max(), img_.min(), img_.mean(), img_.std()))
-        
-        # img = img.crop((
-        #     bb2d.topX, 
-        #     bb2d.topY,
-        #     bb2d.topX + bb2d.w,
-        #     bb2d.topY + bb2d.h
-        #     ))       
-
+        tag = annotation.tag
+        img = Image.open(os.path.join(self.data_root_dir, tag, 'sample_files', image_name))  
         img = self.transform(img)
-        # print((img.max(), img.min(), img.mean(), img.std()))
-        # saving_path =  annotation.id_image + "_trans" + '.jpg'
-        # plot_sample(img, lm3d, bbox, saving_path=os.path.join(base_path, saving_path))
 
         target = {
             "lm3d" : lm3d,
@@ -211,6 +177,7 @@ class PTDataset300WLP(Dataset):
 
 
 # def main():
+#     # Input arguments
 #     params = {
 #         'model_input_size': (450, 450),  # Width x Height of input tensor for the model
 #         'min_landmark_count': 68,  # Min number of landmarks 
@@ -218,7 +185,8 @@ class PTDataset300WLP(Dataset):
 #         'expression_param_size': 29
 #     }
 
-#     data_dir = '/hdd1/datasets/300W_LP/output_debug/IBUG'
+#     data_root_dir = '/hdd1/datasets/300W_LP/output_debug/'
+#     tags = ["IBUG", "IBUG_Flip"] #, "AFW", "AFW_Flip"]
 
 #     # Create dataset instance
 #     normalize = Normalize(
@@ -227,17 +195,41 @@ class PTDataset300WLP(Dataset):
 #         )
 #     add_transforms = [normalize]
 
+
+#     # Build and test Data Loader
 #     dataset = PTDataset300WLP(
-#         data_dir=data_dir, 
+#         data_root_dir=data_root_dir, 
+#         tags=tags, 
 #         operating_mode='memory', 
 #         add_transforms=add_transforms,
 #         **params
 #         )
 
-#     # Test it
 #     for i in range(len(dataset)):
 #         img, target = dataset.__getitem__(i)
 
 
 # if __name__ == main():
 #     main()
+
+# !OLD plotting code
+# bbox = [
+#     bb2d.topX, 
+#     bb2d.topY,
+#     bb2d.w,
+#     bb2d.h
+# ]
+
+# base_path = "example_dataloaders/sample_imgs"
+# Path(base_path).mkdir(parents=True, exist_ok=True)
+# saving_path =  annotation.id_image + "_ori" + '.jpg'
+# plot_sample(img, lm3d, bbox, saving_path=os.path.join(base_path, saving_path))
+# img_ = np.array(img)     
+# print((img_.max(), img_.min(), img_.mean(), img_.std()))
+
+# img = img.crop((
+#     bb2d.topX, 
+#     bb2d.topY,
+#     bb2d.topX + bb2d.w,
+#     bb2d.topY + bb2d.h
+#     ))     

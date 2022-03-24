@@ -7,7 +7,12 @@ mkdir -p ${LOG_DIR}
 LOG_FILE="${LOG_DIR}/`date +'%Y-%m-%d_%H:%M.%S'`.log"
 
 python3 main_train.py \
-    --datatool_path="/hdd1/datasets/300W_LP/output_debug/IBUG" \
+    --datatool-root-dir="/hdd1/datasets/300W_LP/output_debug/" \
+    --train-tags="AFW" \
+    --val-tags="IBUG" \
+    # --train-tags="HELEN, HELEN_Flip, LFPW, LFPW_Flip" \
+    # --val-tags="AFW, AFW_Flip, IBUG, IBUG_Flip" \
+    
     --arch="mobilenet_v2" \
     --start-epoch=1 \
     --snapshot="ckpts/SynergyNet" \

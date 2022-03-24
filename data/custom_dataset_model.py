@@ -2,7 +2,7 @@ from __future__ import annotations
 from data.datatool_api.models.base.BaseDTDataset import BaseDTDataset
 from data.datatool_api.data_validation.containers.StorageValDict import StorageValDict
 from data.datatool_api.data_validation.containers.ValDict import ValDict
-from .custom_base_types import *
+from data.custom_base_types import *
 from typing import Tuple
 import pandas
 

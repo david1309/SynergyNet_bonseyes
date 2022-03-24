@@ -30,7 +30,9 @@ args = None # define the static training setting, which wouldn't and shouldn't b
 
 def parse_args():
     parser = argparse.ArgumentParser(description='3DMM Fitting')
-    parser.add_argument('--datatool-path', type=str)
+    parser.add_argument('--datatool-root-dir', type=str)
+    parser.add_argument('--train-tags', default="HELEN, HELEN_Flip, LFPW, LFPW_Flip", type=str)
+    parser.add_argument('--val-tags', default="AFW, AFW_Flip, IBUG, IBUG_Flip", type=str)
 
     parser.add_argument('-j', '--workers', default=4, type=int)
     parser.add_argument('--epochs', default=40, type=int)
@@ -61,6 +63,8 @@ def parse_args():
     args = parser.parse_args()
 
     # some other operations
+    args.train_tags = [str(t) for t in args.train_tags.split(',')]
+    args.val_tags = [str(t) for t in args.val_tags.split(',')]
     args.devices_id = [int(d) for d in args.devices_id.split(',')]
     args.milestones = [int(m) for m in args.milestones.split(',')]
 
@@ -104,7 +108,7 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
  
-def dataset_from_datatool(datatool_path, add_transforms=[]):
+def dataset_from_datatool(datatool_root_dir, tags, add_transforms=[]):
     params = {
         'model_input_size': (450, 450),  # Width x Height of input tensor for the model
         'min_landmark_count': 68,  # Min number of landmarks 
@@ -112,7 +116,8 @@ def dataset_from_datatool(datatool_path, add_transforms=[]):
         'expression_param_size': 29
     }
     dataset = PTDataset300WLP(
-        data_dir=datatool_path, 
+        data_root_dir=datatool_root_dir,
+        tags=tags, 
         operating_mode='memory', 
         add_transforms=add_transforms,
         **params
@@ -143,7 +148,6 @@ def train(train_loader, model, optimizer, epoch, lr, writer):
 
         input = input.cuda(non_blocking=True)
         target = parse_target_to_cuda(target)
-        
         losses = model(input, target)
 
         data_time.update(time.time() - end)
@@ -177,6 +181,44 @@ def train(train_loader, model, optimizer, epoch, lr, writer):
             for k in range(len(losses_meter)):
                 writer.add_scalar('TrainLoss/' + losses_name[k], losses_meter[k].val, epoch*len(train_loader) + i)
 
+
+def validate(val_loader, model, epoch, tot_train_samples, writer):
+    """Network validation, and computing validation metrics"""
+
+    # AverageMeter for statistics
+    losses_name = list(model.get_losses())
+    losses_name.append('loss_total')
+    losses_meter = [AverageMeter() for i in range(len(losses_name))]
+
+    model.eval()
+
+    for i, (input, target) in enumerate(val_loader):
+
+        input = input.cuda(non_blocking=True)
+        target = parse_target_to_cuda(target)
+
+        with torch.no_grad():
+            losses  = model(input, target)
+
+        loss_total = 0
+        for j, name in enumerate(losses):
+            mean_loss = losses[name].mean()
+            losses_meter[j].update(mean_loss, input.size(0))
+            loss_total += mean_loss
+
+        losses_meter[j+1].update(loss_total, input.size(0))
+
+
+    msg = (
+        'Validation losses:\t' + \
+        'Epoch: [{}]\t'.format(epoch)
+    )
+    for k in range(len(losses_meter)):
+        msg += '{}: {:.4f} ({:.4f})\t'.format(losses_name[k], losses_meter[k].val, losses_meter[k].avg)
+    logging.info(msg)
+
+    for k in range(len(losses_meter)):
+        writer.add_scalar('ValLoss/' + losses_name[k], losses_meter[k].val, tot_train_samples)
 
 def main():
     """ Main funtion for the training process"""
@@ -225,9 +267,12 @@ def main():
     #     )
     # add_transforms = [normalize]
     add_transforms = []
-    train_dataset = dataset_from_datatool(args.datatool_path, add_transforms)
+    train_dataset = dataset_from_datatool(args.datatool_root_dir, args.train_tags, add_transforms)
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.workers,
                               shuffle=True, pin_memory=True, drop_last=True)
+    val_dataset = dataset_from_datatool(args.datatool_root_dir, args.val_tags, add_transforms)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, num_workers=args.workers,
+                              shuffle=False, pin_memory=True, drop_last=False)
 
     
     # step4: run
@@ -245,8 +290,12 @@ def main():
         train(train_loader, model, optimizer, epoch, lr, writer)
 
         filename = f'{args.snapshot}_checkpoint_epoch_{epoch}.pth.tar'
+
         # save checkpoints and current model validation
         if (epoch % args.save_val_freq == 0) or (epoch==args.epochs):
+
+            tot_train_samples = (epoch + 1) * len(train_loader)
+            validate(val_loader, model, epoch, tot_train_samples, writer)
             save_checkpoint(
                 {
                     'epoch': epoch,
@@ -254,7 +303,6 @@ def main():
                 },
                 filename
             )
-            # logging.info('\nVal[{}]'.format(epoch))
             # benchmark_pipeline(model) # TODO
 
 if __name__ == '__main__':

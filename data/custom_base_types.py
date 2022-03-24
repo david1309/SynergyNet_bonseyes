@@ -104,6 +104,7 @@ class Dataset300WLPImage(BaseModel):
     Attributes:
         id: str: Image ID
         file_path: str: File path for the image
+        tag: str: Name of tag / subfolder where image is located e.g. IBUG, HELEN
         width: int: Image width in pixels
         height: int: Image height in pixels
         depth: int: Number of channels in the Image
@@ -111,6 +112,7 @@ class Dataset300WLPImage(BaseModel):
     """
     id: str = Attribute(type=str)
     file_path: str = Attribute(type=str)
+    tag: str = Attribute(type=str)
     width: int = Attribute(type=int)
     height: int = Attribute(type=int)
     depth: int = Attribute(type=int)
@@ -120,6 +122,7 @@ class Dataset300WLPImage(BaseModel):
         self, 
         id: str = None,
         file_path: str = None,
+        tag: str = None,
         width: int = None,
         height: int = None,
         depth: int = None,
@@ -138,6 +141,7 @@ class Dataset300WLPImage(BaseModel):
         """
         self.id = str(inputDict['id'])
         self.file_path = str(inputDict['file_path'])
+        self.tag = str(inputDict['tag'])
         self.width = inputDict['width']
         self.height = inputDict['height']
         self.depth = inputDict['depth']
@@ -221,6 +225,7 @@ class Dataset300WLPAnnotation(BaseModel):
     id_annotation: str: Annotation ID
     id_image: str: ID of the Image liked with the annotation
     file_path: str: path to annotation file
+    tag: str: Name of tag / subfolder where image is located e.g. IBUG, HELEN
     face_landmarks_2d: ValList[Landmark2D]: List of 2D face landmarks
     count_face_landmarks_2d: int: Number of landmarks per annotation
     face_landmarks_3d: ValList[Landmark3D]: List of 3D face landmarks
@@ -235,6 +240,7 @@ class Dataset300WLPAnnotation(BaseModel):
     id_annotation: str = Attribute(type=str)
     id_image: str = Attribute(type=str)
     file_path: str = Attribute(type=str)
+    tag: str = Attribute(type=str)
     face_landmarks_2d: ValList[Landmark2D] = Attribute(
         type=ValList,
         element_constraints=Attribute(type=Landmark2D)
@@ -258,6 +264,7 @@ class Dataset300WLPAnnotation(BaseModel):
         id_annotation: str = None,
         id_image: str = None,
         file_path: str = None,
+        tag: str = None,
         face_landmarks_2d: ValList[Landmark2D] = None,
         count_face_landmarks_2d: int = None,
         face_landmarks_3d: ValList[Landmark3D] = None,
@@ -319,6 +326,7 @@ class Dataset300WLPAnnotation(BaseModel):
         self.id_annotation = str(inputDict['id_annotation'])
         self.id_image = str(inputDict['id_image'])
         self.file_path = str(inputDict['file_path'])
+        self.tag = str(inputDict['tag'])
 
         # 3d landmarks
         self.face_landmarks_3d = self.extract_3d_landmarks(inputDict['pt3d'])
@@ -350,7 +358,7 @@ class Dataset300WLPAnnotation(BaseModel):
                                  confidence=1.0)
 
         ## Shape & Expression:
-        self.shape_params = list(inputDict["Shape_Para"][:, 0])
-        self.exp_params = list(inputDict["Exp_Para"][:, 0])
+        self.shape_params = list(np.float64(inputDict["Shape_Para"][:, 0]))
+        self.exp_params = list(np.float64(inputDict["Exp_Para"][:, 0]))
 
         return self

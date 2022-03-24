@@ -149,13 +149,13 @@ class SynergyNet(nn.Module):
 		pose_para, shape_para, exp_para = self.parse_pred_params(_3D_attr)
 		vertex_lmk = self.lm_from_params(pose_para, shape_para, exp_para, input.shape[2])  # Coarse landamrks: Lc
 		vertex_GT_lmk = target["lm3d"].permute(0, 2, 1)
-		#gt = self.lm_from_params(target["pose_params"].unsqueeze(-1), target["shape_params"].unsqueeze(-1), target["exp_params"].unsqueeze(-1), input.shape[2])
+		# gt = self.lm_from_params(target["pose_params"].unsqueeze(-1), target["shape_params"].unsqueeze(-1), target["exp_params"].unsqueeze(-1), input.shape[2])
 
 		self.loss['loss_LMK_f0'] = 0.05 * self.LMKLoss_3D(vertex_lmk, vertex_GT_lmk)		
 		self.loss['loss_Param_In'] = 0.02 * self.ParamLoss(_3D_attr, _3D_attr_GT)
 		
 		# Coarse landmarks to Refined landmarks
-		point_residual = self.forwardDirection(vertex_lmk, avgpool, shape_para, exp_para)  # _3D_attr[:, 7: 199+7], _3D_attr[:, 199+7: 199+7+29])
+		point_residual = self.forwardDirection(vertex_lmk, avgpool, shape_para, exp_para)
 		vertex_lmk = vertex_lmk + point_residual  # Refined landmarks: Lr = Lc + L_residual
 		self.loss['loss_LMK_pointNet'] = 0.05 * self.LMKLoss_3D(vertex_lmk, vertex_GT_lmk)
 
@@ -168,8 +168,17 @@ class SynergyNet(nn.Module):
 
 	def forward_test(self, input):
 		"""test time forward"""
-		_3D_attr, _ = self.I2P.forward_test(input)
-		return _3D_attr
+		with torch.no_grad():
+			# Image to 3DMM Parameters
+			_3D_attr, avgpool = self.I2P.forward(input)
+			pose_para, shape_para, exp_para = self.parse_pred_params(_3D_attr)
+			vertex_lmk = self.lm_from_params(pose_para, shape_para, exp_para, input.shape[2])  # Coarse landamrks: Lc
+
+			# Coarse landmarks to Refined landmarks
+			point_residual = self.forwardDirection(vertex_lmk, avgpool, shape_para, exp_para)
+			vertex_lmk = vertex_lmk + point_residual  # Refined landmarks: Lr = Lc + L_residual
+
+		return vertex_lmk, pose_para, shape_para, exp_para 
 
 	def get_losses(self):
 		return self.loss.keys()
