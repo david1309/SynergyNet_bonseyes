@@ -47,9 +47,9 @@ class SynergyNet(nn.Module):
 		
 		self.bfm = MorphabelModel('bfm_utils/morphable_models/BFM.mat')
 		# Store the base in a tensor type
-		self.shapeMU = torch.tensor(self.bfm.model['shapeMU']).reshape(3,-1,self.bfm.model['shapeMU'].shape[-1]).permute(1,2,0)[self.bfm.kpt_ind].cuda()
-		self.shapePC = torch.tensor(self.bfm.model['shapePC']).reshape(3,-1,self.bfm.model['shapePC'].shape[-1]).permute(1,2,0)[self.bfm.kpt_ind].cuda()
-		self.expPC = torch.tensor(self.bfm.model['expPC']).reshape(3,-1,self.bfm.model['expPC'].shape[-1]).permute(1,2,0)[self.bfm.kpt_ind].cuda()
+		self.shapeMU = torch.tensor(np.reshape(self.bfm.model['shapeMU'],[int(3), int(len(self.bfm.model['shapeMU'])/3)],     'F').T[self.bfm.kpt_ind]).unsqueeze(1).cuda()
+		self.shapePC = torch.tensor(np.reshape(self.bfm.model['shapePC'],[int(3), int(len(self.bfm.model['shapePC'])/3), -1], 'F').transpose(1,2,0)[self.bfm.kpt_ind]).cuda()
+		self.expPC   = torch.tensor(np.reshape(self.bfm.model['expPC'],  [int(3), int(len(self.bfm.model['expPC'])/3),   -1], 'F').transpose(1,2,0)[self.bfm.kpt_ind]).cuda()
 		self.img_size = args.img_size
 
 		# Image-to-parameter
@@ -97,12 +97,12 @@ class SynergyNet(nn.Module):
 		return R
 
 
-	def lm_from_params(self, pose_para, shape_para, exp_para):
+	def lm_from_params(self, pose_para, shape_para, exp_para, h):
 		# Get parameters
 		# TODO: move BFM's parameters
-		#pose_para = pose_para.detach().cpu().numpy()
-		#shape_para = shape_para.detach().cpu().numpy()
-		#exp_para = exp_para.detach().cpu().numpy()
+		#pose_para = pose_para.detach().cpu().numpy()[0]
+		#shape_para = shape_para.detach().cpu().numpy()[0]
+		#exp_para = exp_para.detach().cpu().numpy()[0]
 		s = pose_para[:, -1, 0]  # Scale
 		angles = pose_para[:, :3, 0]  # Rotation angles
 		t = pose_para[:, 3:6, 0]  # Translation
@@ -112,7 +112,8 @@ class SynergyNet(nn.Module):
 		R = self.angle2matrix_3ddfa(angles)
 
 		# Get the 68 - 3d landmarks
-		landmarks3d = s.unsqueeze(-1).unsqueeze(-1)*torch.bmm(vertices, R) + t.unsqueeze(1)
+		landmarks3d = s.unsqueeze(-1).unsqueeze(-1)*torch.bmm(vertices, R.permute(0,2,1)) + t.unsqueeze(1)
+		landmarks3d[:, :, 1] = h - landmarks3d[:, :, 1] + 1
 
 		return landmarks3d
 
@@ -142,8 +143,9 @@ class SynergyNet(nn.Module):
 		_3D_attr, avgpool = self.I2P(input)
 		_3D_attr_GT = self.parse_target_params(target)
 		pose_para, shape_para, exp_para = self.parse_pred_params(_3D_attr)
-		vertex_lmk = self.lm_from_params(pose_para, shape_para, exp_para)  # Coarse landamrks: Lc
+		vertex_lmk = self.lm_from_params(pose_para, shape_para, exp_para, input.shape[2])  # Coarse landamrks: Lc
 		vertex_GT_lmk = target["lm3d"].permute(0, 2, 1)
+		#gt = self.lm_from_params(target["pose_params"].unsqueeze(-1), target["shape_params"].unsqueeze(-1), target["exp_params"].unsqueeze(-1), input.shape[2])
 
 		self.loss['loss_LMK_f0'] = 0.05 * self.LMKLoss_3D(vertex_lmk, vertex_GT_lmk)		
 		self.loss['loss_Param_In'] = 0.02 * self.ParamLoss(_3D_attr, _3D_attr_GT)
