@@ -126,6 +126,17 @@ class PTDataset300WLP(Dataset):
         lm3d = annotation.face_landmarks_3d
         bb2d = annotation.face_bounding_box_2d
 
+        # Transform bb2d to have squared images
+        # max_dim = max(bb2d.w,bb2d.h)
+        # if max_dim==bb2d.w:
+        #     diff = max_dim - bb2d.h
+        #     bb2d.topY -= diff/2.0
+        #     bb2d.h = bb2d.w
+        # else:
+        #     diff = max_dim - bb2d.w
+        #     bb2d.topX -= diff/2.0
+        #     bb2d.w = bb2d.h 
+
         # Morphable parameters
         shape_params = torch.Tensor(annotation.shape_params)
         exp_params = torch.Tensor(annotation.exp_params)
@@ -138,20 +149,29 @@ class PTDataset300WLP(Dataset):
         ]
         head_translation = annotation.head_translation
         head_scale = [annotation.head_scale]
+
+        # Transform respect the cropping
+        model_input_size = self.kwargs['model_input_size']
+        # head_scale[0] *= model_input_size[0] / bb2d.w
+        # head_translation[0] = (head_translation[0] - bb2d.topX) * model_input_size[0] / bb2d.w
+        # head_translation[1] = (head_translation[1] - bb2d.topY) * model_input_size[1] / bb2d.h
         pose_params = torch.Tensor([head_pose + head_translation + head_scale]).squeeze()
 
         # Adjust landmark values for new coordinate system of cropped image
         lm3d_temp = np.empty(shape=(3, annotation.count_face_landmarks_3d))
-        model_input_size = self.kwargs['model_input_size']
         for i, lm in enumerate(lm3d):
-            lm3d_temp[0,i] = (lm.x - bb2d.topX) * model_input_size[0] / bb2d.w
-            lm3d_temp[1,i] = (lm.y - bb2d.topY) * model_input_size[1] / bb2d.h
+            lm3d_temp[0,i] = lm.x #(lm.x - bb2d.topX) * model_input_size[0] / bb2d.w
+            lm3d_temp[1,i] = lm.y #(lm.y - bb2d.topY) * model_input_size[1] / bb2d.h
             lm3d_temp[2,i] = lm.z
         lm3d = torch.from_numpy(lm3d_temp)
 
         # Read image for the sample and Apply transforms
         image_name = annotation.id_image + '.jpg'
         img = Image.open(os.path.join(self.data_dir, 'sample_files', image_name))
+        orig_height = img.height
+
+        # Elaborate the new pose params
+        pose_params[-1]
 
         bbox = [
             bb2d.topX, 
@@ -167,12 +187,12 @@ class PTDataset300WLP(Dataset):
         # img_ = np.array(img)     
         # print((img_.max(), img_.min(), img_.mean(), img_.std()))
         
-        img = img.crop((
-            bb2d.topX, 
-            bb2d.topY,
-            bb2d.topX + bb2d.w,
-            bb2d.topY + bb2d.h
-            ))       
+        # img = img.crop((
+        #     bb2d.topX, 
+        #     bb2d.topY,
+        #     bb2d.topX + bb2d.w,
+        #     bb2d.topY + bb2d.h
+        #     ))       
 
         img = self.transform(img)
         # print((img.max(), img.min(), img.mean(), img.std()))
@@ -184,6 +204,9 @@ class PTDataset300WLP(Dataset):
             "pose_params" : pose_params,
             "shape_params" : shape_params,
             "exp_params" : exp_params,
+            "pis" : orig_height,
+            "san" : bb2d.topY,
+            "csc" : bb2d.h
         }
         return img, target
 
