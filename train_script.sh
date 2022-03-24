@@ -10,21 +10,21 @@ python3 main_train.py \
     --datatool-root-dir="/hdd1/datasets/300W_LP/output_debug/" \
     --train-tags="AFW" \
     --val-tags="IBUG" \
-    # --train-tags="HELEN, HELEN_Flip, LFPW, LFPW_Flip" \
-    # --val-tags="AFW, AFW_Flip, IBUG, IBUG_Flip" \
-    
-    --arch="mobilenet_v2" \
-    --start-epoch=1 \
-    --snapshot="ckpts/SynergyNet" \
-    --warmup=5 \
-    --batch-size=1024 \
-    --base-lr=0.08 \
+    \
+    --batch-size=16 \
+    --base-lr=0.00001\
     --epochs=80 \
     --milestones=48,64 \
-    --print-freq=50 \
+    --save_val_freq=5 \
+    \
+    --arch="mobilenet_v2" \
+    --snapshot="ckpts/SynergyNet" \
+    --log-file="${LOG_FILE}" \
+    \
+    --start-epoch=1 \
+    --warmup=5 \
+    --print-freq=20 \
     --devices-id=0 \
     --workers=4 \
-    --log-file="${LOG_FILE}" \
     --test_initial=False \
-    --save_val_freq=5 \
     --resume="" \
