@@ -121,6 +121,7 @@ class PTDataset300WLP(Dataset):
     def __getitem__(self, index):
         annot_id = self.usable_annotations[index]
         annotation = self.dataset.annotations.get(annot_id)
+        model_input_size = self.kwargs['model_input_size']
 
         # Landmarks 
         lm3d = annotation.face_landmarks_3d
@@ -138,8 +139,8 @@ class PTDataset300WLP(Dataset):
         #     bb2d.w = bb2d.h 
 
         # Morphable parameters
-        shape_params = torch.Tensor(annotation.shape_params)
-        exp_params = torch.Tensor(annotation.exp_params)
+        shape_params = torch.Tensor(annotation.shape_params)/1e7
+        exp_params = torch.Tensor(annotation.exp_params)/10
         head_pose_ = annotation.head_pose
         deg2rad = (np.pi / 90)
         head_pose = [
@@ -148,10 +149,10 @@ class PTDataset300WLP(Dataset):
             head_pose_.yaw * deg2rad,
         ]
         head_translation = annotation.head_translation
-        head_scale = [annotation.head_scale]
+        head_translation = [x/model_input_size[0] for x in head_translation]
+        head_scale = [annotation.head_scale*100]
 
         # Transform respect the cropping
-        model_input_size = self.kwargs['model_input_size']
         # head_scale[0] *= model_input_size[0] / bb2d.w
         # head_translation[0] = (head_translation[0] - bb2d.topX) * model_input_size[0] / bb2d.w
         # head_translation[1] = (head_translation[1] - bb2d.topY) * model_input_size[1] / bb2d.h
@@ -203,10 +204,7 @@ class PTDataset300WLP(Dataset):
             "lm3d" : lm3d,
             "pose_params" : pose_params,
             "shape_params" : shape_params,
-            "exp_params" : exp_params,
-            "pis" : orig_height,
-            "san" : bb2d.topY,
-            "csc" : bb2d.h
+            "exp_params" : exp_params
         }
         return img, target
 

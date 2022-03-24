@@ -103,9 +103,13 @@ class SynergyNet(nn.Module):
 		#pose_para = pose_para.detach().cpu().numpy()[0]
 		#shape_para = shape_para.detach().cpu().numpy()[0]
 		#exp_para = exp_para.detach().cpu().numpy()[0]
-		s = pose_para[:, -1, 0]  # Scale
+		s = pose_para[:, -1, 0]/100  # Scale
 		angles = pose_para[:, :3, 0]  # Rotation angles
-		t = pose_para[:, 3:6, 0]  # Translation
+		t = pose_para[:, 3:6, 0]*h  # Translation
+
+		# Denormalize values
+		shape_para = shape_para*1e7
+		exp_para = exp_para*10
 
 		# Generate vertices + apply transforms (rotation, translation, scaling)
 		vertices = self.shapeMU.permute(1,0,2) + (shape_para[...,0] @ self.shapePC + exp_para[...,0] @ self.expPC).permute(1,0,2)
@@ -152,7 +156,7 @@ class SynergyNet(nn.Module):
 		
 		# Coarse landmarks to Refined landmarks
 		point_residual = self.forwardDirection(vertex_lmk, avgpool, shape_para, exp_para)  # _3D_attr[:, 7: 199+7], _3D_attr[:, 199+7: 199+7+29])
-		vertex_lmk = vertex_lmk + 0.05 * point_residual  # Refined landmarks: Lr = Lc + 0.05 * L_residual
+		vertex_lmk = vertex_lmk + 0.5 * point_residual  # Refined landmarks: Lr = Lc + 0.5 * L_residual
 		self.loss['loss_LMK_pointNet'] = 0.05 * self.LMKLoss_3D(vertex_lmk, vertex_GT_lmk)
 
 		# Refined landmarks to 3DMM parameters
