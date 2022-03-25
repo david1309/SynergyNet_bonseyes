@@ -65,11 +65,11 @@ class SynergyNet(nn.Module):
 		self.LMKLoss_3D = WingLoss()
 		self.ParamLoss = ParamLoss()
 		self.loss = {
-			'loss_LMK_f0': 0.0,
-			'loss_LMK_pointNet': 0.0,
-			'loss_Param_In': 0.0,
-			'loss_Param_S2': 0.0,
-			'loss_Param_S1S2': 0.0,
+			'loss_lmk_s1': 0.0,
+			'loss_lmk_s2': 0.0,
+			'loss_param_s1': 0.0,
+			'loss_param_s2': 0.0,
+			'loss_param_s1s2': 0.0,
 			}
 
 	def angle2matrix_3ddfa(self, angles):
@@ -151,18 +151,18 @@ class SynergyNet(nn.Module):
 		vertex_GT_lmk = target["lm3d"].permute(0, 2, 1)
 		# gt = self.lm_from_params(target["pose_params"].unsqueeze(-1), target["shape_params"].unsqueeze(-1), target["exp_params"].unsqueeze(-1), input.shape[2])
 
-		self.loss['loss_LMK_f0'] = 0.05 * self.LMKLoss_3D(vertex_lmk, vertex_GT_lmk)		
-		self.loss['loss_Param_In'] = 0.02 * self.ParamLoss(_3D_attr, _3D_attr_GT)
+		self.loss['loss_lmk_s1'] = 0.05 * self.LMKLoss_3D(vertex_lmk, vertex_GT_lmk)		
+		self.loss['loss_param_s1'] = 0.02 * self.ParamLoss(_3D_attr, _3D_attr_GT)
 		
 		# Coarse landmarks to Refined landmarks
 		point_residual = self.forwardDirection(vertex_lmk, avgpool, shape_para, exp_para)
 		vertex_lmk = vertex_lmk + point_residual  # Refined landmarks: Lr = Lc + L_residual
-		self.loss['loss_LMK_pointNet'] = 0.05 * self.LMKLoss_3D(vertex_lmk, vertex_GT_lmk)
+		self.loss['loss_lmk_s2'] = 0.05 * self.LMKLoss_3D(vertex_lmk, vertex_GT_lmk)
 
 		# Refined landmarks to 3DMM parameters
 		_3D_attr_S2 = self.reverseDirection(vertex_lmk)
-		self.loss['loss_Param_S2'] = 0.02 * self.ParamLoss(_3D_attr_S2, _3D_attr_GT, mode='only_3dmm')
-		self.loss['loss_Param_S1S2'] = 0.001 * self.ParamLoss(_3D_attr_S2, _3D_attr, mode='only_3dmm')
+		self.loss['loss_param_s2'] = 0.02 * self.ParamLoss(_3D_attr_S2, _3D_attr_GT, mode='only_3dmm')
+		self.loss['loss_param_s1s2'] = 0.001 * self.ParamLoss(_3D_attr_S2, _3D_attr, mode='only_3dmm')
 
 		return self.loss
 
