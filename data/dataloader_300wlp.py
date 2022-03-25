@@ -180,6 +180,22 @@ class PTDataset300WLP(Dataset):
         return img, target
 
 
+def dataset_from_datatool(datatool_root_dir, tags, add_transforms=[]):
+    params = {
+        'model_input_size': (450, 450),  # Width x Height of input tensor for the model
+        'min_landmark_count': 68,  # Min number of landmarks 
+        'shape_param_size': 199,
+        'expression_param_size': 29
+    }
+    dataset = PTDataset300WLP(
+        data_root_dir=datatool_root_dir,
+        tags=tags, 
+        operating_mode='memory', 
+        add_transforms=add_transforms,
+        **params
+        )
+    
+    return dataset
 
 # def main():
 #     # Input arguments
