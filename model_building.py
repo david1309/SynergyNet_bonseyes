@@ -99,10 +99,6 @@ class SynergyNet(nn.Module):
 
 	def lm_from_params(self, pose_para, shape_para, exp_para, h):
 		# Get parameters
-		# TODO: move BFM's parameters
-		#pose_para = pose_para.detach().cpu().numpy()[0]
-		#shape_para = shape_para.detach().cpu().numpy()[0]
-		#exp_para = exp_para.detach().cpu().numpy()[0]
 		s = pose_para[:, -1, 0]/100  # Scale
 		angles = pose_para[:, :3, 0]  # Rotation angles
 		t = pose_para[:, 3:6, 0]*h  # Translation

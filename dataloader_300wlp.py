@@ -100,10 +100,10 @@ class PTDataset300WLP(Dataset):
             for annot_id, annotation in dataset.annotations.items():
                 flags = []
                 flags.append(
-                    annotation.count_face_landmarks_2d == self.kwargs['min_landmark_count']
+                    annotation.count_face_landmarks_2d >= self.kwargs['min_landmark_count']
                     )
                 flags.append(
-                    annotation.count_face_landmarks_3d == self.kwargs['min_landmark_count']
+                    annotation.count_face_landmarks_3d >= self.kwargs['min_landmark_count']
                 )
                 flags.append(
                     len(annotation.shape_params) == self.kwargs['shape_param_size']
@@ -140,12 +140,17 @@ class PTDataset300WLP(Dataset):
         shape_params = torch.Tensor(annotation.shape_params) / 1e7
         exp_params = torch.Tensor(annotation.exp_params) / 10
 
+        # BFM documentation states that:
+        # angles: [3,]. x, y, z angles
+        # x: pitch.
+        # y: yaw. 
+        # z: roll. 
         head_pose_ = annotation.head_pose
-        deg2rad = (np.pi / 90)
+        deg2rad = (np.pi / 180)
         head_pose = [
-            head_pose_.roll * deg2rad,
             head_pose_.pitch * deg2rad, 
             head_pose_.yaw * deg2rad,
+            head_pose_.roll * deg2rad,
         ]
         head_translation = annotation.head_translation
         head_translation = [t / model_input_size[0] for t in head_translation]

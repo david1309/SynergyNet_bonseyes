@@ -9,7 +9,6 @@ import time
 import logging
 
 import torch
-import torch.nn as nn
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 import torch.backends.cudnn as cudnn
@@ -106,7 +105,6 @@ def save_checkpoint(state, filename='checkpoint.pth.tar'):
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
-
  
 def dataset_from_datatool(datatool_root_dir, tags, add_transforms=[]):
     params = {
@@ -240,7 +238,7 @@ def main():
     model = SynergyNet(args)
     torch.cuda.set_device(args.devices_id[0])
 
-    model = model.cuda() #nn.DataParallel(model, device_ids=args.devices_id).cuda()  # -> GPU
+    model = model.cuda()
 
     # step2: optimization: loss and optimization method
 
