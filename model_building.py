@@ -59,14 +59,9 @@ def get_bfm_params(bfm_path):
 	kpt_index.append(int(bfm.kpt_ind[37]) + 40)
 	# 75 landmark
 	kpt_index.append(int(bfm.kpt_ind[46]) + 20)
-
-	# TODO: Damiano, this is easy but I am tired XD
-	# landmarks3d = image_vertices[kpt_index]
-	# # Middle of eye
-	# middle_eye = (landmarks3d[68] + landmarks3d[69])/2.0
-	# # Center head
-	# center_head = (image_vertices[20000] + image_vertices[34000])/2.0
-	# landmarks3d = np.concatenate([landmarks3d, middle_eye[np.newaxis], center_head[np.newaxis]])
+	# Landmarks used to compute center of eyes
+	kpt_index.append(20000)
+	kpt_index.append(34000)
 
 	# Store the base in a tensor type
 	shapeMU = torch.tensor(np.reshape(bfm.model['shapeMU'],[int(3), int(len(bfm.model['shapeMU'])/3)],     'F').T[kpt_index]).unsqueeze(1).cuda()
@@ -144,7 +139,15 @@ class SynergyNet(nn.Module):
 		R = self.angle2matrix_3ddfa(angles)
 
 		# Get the  3d landmarks
-		landmarks3d = s.unsqueeze(-1).unsqueeze(-1)*torch.bmm(vertices, R.permute(0,2,1)) + t.unsqueeze(1)
+		landmarks3d_with_help_lands = s.unsqueeze(-1).unsqueeze(-1)*torch.bmm(vertices, R.permute(0,2,1)) + t.unsqueeze(1)
+
+		# Compute
+		landmarks3d = landmarks3d_with_help_lands[:,:-2]
+		# Add center of eyes and center of head
+		center_of_eyes = (landmarks3d_with_help_lands[:,68] + landmarks3d_with_help_lands[:,69])/2.0
+		center_head = (landmarks3d_with_help_lands[:,-2] + landmarks3d_with_help_lands[:,-1])/2.0
+		# Cat these components
+		landmarks3d = torch.cat([landmarks3d, center_of_eyes.unsqueeze(1), center_head.unsqueeze(1)], axis=1)
 		landmarks3d[:, :, 1] = h - landmarks3d[:, :, 1] + 1
 
 		return landmarks3d
