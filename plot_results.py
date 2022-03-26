@@ -150,7 +150,7 @@ if __name__ == '__main__':
     args.arch = "mobilenet_v2"
     args.img_size = 450
     args.devices_id = [0]
-    args.num_lms = 75
+    args.num_lms = 77
     
     ckp_epoch = 10
     ckp_date = "ckpts_01h24m41s_26.03.2022"
