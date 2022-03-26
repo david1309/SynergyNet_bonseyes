@@ -11,7 +11,7 @@ python3 main_train.py \
     --epochs=100 \
     --milestones=48,64 \
     --save_val_freq=5 \
-    --num-lms=75
+    --num-lms=77
     \
     --arch="mobilenet_v2" \
     \

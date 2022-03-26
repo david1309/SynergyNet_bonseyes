@@ -77,7 +77,7 @@ def parse_args():
     mkdir(args.ckp_dir)
     mkdir(os.path.join(args.ckp_dir, "logs"))
     mkdir(os.path.join(args.ckp_dir, "model_ckpts"))
-    
+
 
 
 
@@ -135,7 +135,6 @@ def train(train_loader, model, optimizer, epoch, lr, writer, imgs_saving_path=No
 
     end = time.time()
     for i, (input, target) in enumerate(train_loader):
-
         input = input.cuda(non_blocking=True)
         target = parse_target_to_cuda(target)
         losses = model(input, target)
@@ -170,15 +169,16 @@ def train(train_loader, model, optimizer, epoch, lr, writer, imgs_saving_path=No
             logging.info(msg)
             for k in range(len(losses_meter)):
                 writer.add_scalar('TrainLoss/' + losses_name[k], losses_meter[k].val, epoch*len(train_loader) + i)
-    
+
     # Plot last batch of images
     if (epoch % args.save_val_freq == 0) or (epoch==args.epochs):
         if imgs_saving_path is not None:
-            n_plot = 3
+            n_samples = 4
             n_input = input.shape[0]
-            idx = np.random.randint(0, n_input, n_plot)
+            idx = np.random.choice(n_input, n_samples, replace=False)
             input_ = input[idx]
-            plot_results(model, input_, imgs_saving_path, targets=target, only_gt=False)
+            target_ = {k:v[idx] for k,v in target.items()}
+            plot_results(model, input_, imgs_saving_path, targets=target_, only_gt=False)
 
 def validate(val_loader, model, epoch, tot_train_samples, writer, imgs_saving_path=None):
     """Network validation, and computing validation metrics"""
@@ -300,12 +300,12 @@ def main():
 
         # save checkpoints and current model validation
         if (epoch % args.save_val_freq == 0) or (epoch==args.epochs):
-            
+
             # Validation
             tot_train_samples = (epoch + 1) * len(train_loader)
             imgs_saving_path = os.path.join(args.ckp_dir, "images_results", "val", f"epoch_{epoch}")
             validate(val_loader, model, epoch, tot_train_samples, writer, imgs_saving_path)
-            
+
             # Checkpointing
             filename = os.path.join(args.ckp_dir, "model_ckpts", f"SynergyNet_ckp_epoch_{epoch}.pth.tar")
             save_checkpoint(

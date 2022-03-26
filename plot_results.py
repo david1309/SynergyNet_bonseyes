@@ -124,7 +124,7 @@ def plot_results(model, images, saving_path, targets=None, only_gt=False):
             lm_3d = lms_3d[i].T
             head_pose = pose_para[i, :3, 0]
 
-            lm_color = (255, 150, 0)
+            lm_color = (255, 150, 0) # BGR
             _plot_lms(plotter, lm_3d, lm_color)
             ax_colors = [(0,0,255), (0,255,0), (255,0,0)] # BGR scale
             _plot_head_pose(plotter, head_pose, lm_3d, ax_colors)
@@ -134,7 +134,7 @@ def plot_results(model, images, saving_path, targets=None, only_gt=False):
             lm_3d_gt = lms_3d_gt[i]
             head_pose_gt = pose_para_gt[i, :3]
 
-            lm_color = (0, 150, 255)
+            lm_color = (0, 150, 255) # BGR
             _plot_lms(plotter, lm_3d_gt, lm_color)
             ax_colors = [(0,0,90), (0,90,0), (90,0,0)] # BGR scale
             _plot_head_pose(plotter, head_pose_gt, lm_3d_gt, ax_colors)
@@ -145,6 +145,9 @@ def plot_results(model, images, saving_path, targets=None, only_gt=False):
 
 
 if __name__ == '__main__':
+    # Config Other
+    only_gt = True
+
     # Config Model
     args = namedtuple("args", ["arch", "img_size", "devices_id", "num_lms"])
     args.arch = "mobilenet_v2"
@@ -153,7 +156,7 @@ if __name__ == '__main__':
     args.num_lms = 77
     
     ckp_epoch = 10
-    ckp_date = "ckpts_01h24m41s_26.03.2022"
+    ckp_date = "ckpts_01h49m33s_26.03.2022"
     ckp_path = f"ckpts/{ckp_date}/model_ckpts/SynergyNet_ckp_epoch_{ckp_epoch}.pth.tar"
 
     # Config Data Loader
@@ -162,9 +165,6 @@ if __name__ == '__main__':
     add_transforms = []
     batch_size = 16
     workers = 4
-
-    # Config Other
-    saving_path = f"ckpts/{ckp_date}/images_results_test"
 
     # Build objects and plot
     model = SynergyNet(args)
@@ -175,10 +175,10 @@ if __name__ == '__main__':
 
     dataset = dataset_from_datatool(datatool_root_dir, tags, add_transforms)
     data_loader = DataLoader(dataset, batch_size=batch_size, num_workers=workers,
-                              shuffle=True, pin_memory=True, drop_last=False)
+                              shuffle=False, pin_memory=True, drop_last=False)
 
     images, targets = next(iter(data_loader))
-    only_gt = False
+    saving_path = f"ckpts/{ckp_date}/images_results_test"
     plot_results(
         model, 
         images, 
