@@ -59,7 +59,7 @@ def parse_args():
     parser.add_argument('--warmup', default=-1, type=int)
     parser.add_argument('--img_size', default=450, type=int)
     parser.add_argument('--save_val_freq', default=10, type=int)
-    parser.add_argument('--debug', default=False, type=bool)
+    parser.add_argument('--debug', default='false', type=str2bool)
     parser.add_argument('--num-lms', default=75, type=int)
 
     global args
