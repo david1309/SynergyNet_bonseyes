@@ -146,26 +146,29 @@ def plot_results(model, images, saving_path, targets=None, only_gt=False):
 
 if __name__ == '__main__':
     # Config Model
-    args = namedtuple("args", ["arch", "img_size", "devices_id"])
+    args = namedtuple("args", ["arch", "img_size", "devices_id", "num_lms"])
     args.arch = "mobilenet_v2"
     args.img_size = 450
     args.devices_id = [0]
-    cp_epoch = 80
-    cp_path = f"ckpts/SynergyNet_checkpoint_epoch_{cp_epoch}.pth.tar"
+    args.num_lms = 75
+    
+    ckp_epoch = 10
+    ckp_date = "ckpts_01h24m41s_26.03.2022"
+    ckp_path = f"ckpts/{ckp_date}/model_ckpts/SynergyNet_ckp_epoch_{ckp_epoch}.pth.tar"
 
     # Config Data Loader
     datatool_root_dir = "/hdd1/datasets/300W_LP/output_debug/" 
-    tags = ["AFW"]
+    tags = ["IBUG"]
     add_transforms = []
     batch_size = 16
     workers = 4
 
     # Config Other
-    saving_path = "ckpts/images_results"
+    saving_path = f"ckpts/{ckp_date}/images_results_test"
 
     # Build objects and plot
     model = SynergyNet(args)
-    checkpoint = torch.load(cp_path, map_location=lambda storage, loc: storage)['state_dict']
+    checkpoint = torch.load(ckp_path, map_location=lambda storage, loc: storage)['state_dict']
     model.load_state_dict(checkpoint, strict=False)
     torch.cuda.set_device(args.devices_id[0])
     model = model.cuda()

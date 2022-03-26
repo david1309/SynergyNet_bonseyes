@@ -4,7 +4,7 @@ import os
 import os.path as osp
 from pathlib import Path
 import numpy as np
-import argparse 
+import argparse
 import time
 import logging
 
@@ -20,8 +20,10 @@ from utils.io import mkdir
 from model_building import SynergyNet as SynergyNet
 # from benchmark_validate import benchmark_pipeline
 
-from dataloader_300wlp import PTDataset300WLP
+from data.dataloader_300wlp import dataset_from_datatool
 from torch.utils.tensorboard import SummaryWriter
+from plot_results import plot_results
+from datetime import datetime
 
 
 # global args (configuration)
@@ -47,7 +49,7 @@ def parse_args():
     parser.add_argument('--resume_pose', default='', type=str, metavar='PATH')
     parser.add_argument('--devices-id', default='0,1', type=str)
     parser.add_argument('--root', default='')
-    parser.add_argument('--snapshot', default='', type=str)
+    parser.add_argument('--ckp-dir', default='ckpts', type=str)
     parser.add_argument('--log-file', default='output.log', type=str)
     parser.add_argument('--log-mode', default='w', type=str)
     parser.add_argument('--arch', default='mobilenet_v2', type=str, help="Please choose [mobilenet_v2, mobilenet_1, resnet50, resnet101, or ghostnet]")
@@ -57,6 +59,8 @@ def parse_args():
     parser.add_argument('--warmup', default=-1, type=int)
     parser.add_argument('--img_size', default=450, type=int)
     parser.add_argument('--save_val_freq', default=10, type=int)
+    parser.add_argument('--debug', default=False, type=bool)
+    parser.add_argument('--num-lms', default=75, type=int)
 
     global args
     args = parser.parse_args()
@@ -67,15 +71,20 @@ def parse_args():
     args.devices_id = [int(d) for d in args.devices_id.split(',')]
     args.milestones = [int(m) for m in args.milestones.split(',')]
 
-    snapshot_dir = osp.split(args.snapshot)[0]
-    mkdir(snapshot_dir)
+    now = datetime.now().strftime("%Hh%Mm%Ss_%d.%m.%Y")
+    args.ckp_dir = os.path.join("ckpts", args.ckp_dir + "_" + now)
+    args.log_file = os.path.join(args.ckp_dir, "logs", args.log_file)
+    mkdir(args.ckp_dir)
+    mkdir(os.path.join(args.ckp_dir, "logs"))
+    mkdir(os.path.join(args.ckp_dir, "model_ckpts"))
+    
+
 
 
 def print_args(args):
     for arg in vars(args):
         s = arg + ': ' + str(getattr(args, arg))
         logging.info(s)
-
 
 def adjust_learning_rate(optimizer, epoch, milestones=None):
     """Sets the learning rate: milestone is a list/tuple"""
@@ -105,31 +114,14 @@ def save_checkpoint(state, filename='checkpoint.pth.tar'):
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
- 
-def dataset_from_datatool(datatool_root_dir, tags, add_transforms=[]):
-    params = {
-        'model_input_size': (450, 450),  # Width x Height of input tensor for the model
-        'min_landmark_count': 68,  # Min number of landmarks 
-        'shape_param_size': 199,
-        'expression_param_size': 29
-    }
-    dataset = PTDataset300WLP(
-        data_root_dir=datatool_root_dir,
-        tags=tags, 
-        operating_mode='memory', 
-        add_transforms=add_transforms,
-        **params
-        )
-
-    return dataset
 
 def parse_target_to_cuda(target):
     for key in target.keys():
-        target[key].requires_grad = False  
+        target[key].requires_grad = False
         target[key] = target[key].float().cuda(non_blocking=True)
     return target
 
-def train(train_loader, model, optimizer, epoch, lr, writer):
+def train(train_loader, model, optimizer, epoch, lr, writer, imgs_saving_path=None):
     """Network training, loss updates, and backward calculation"""
 
     # AverageMeter for statistics
@@ -157,7 +149,7 @@ def train(train_loader, model, optimizer, epoch, lr, writer):
             loss_total += mean_loss
 
         losses_meter[j+1].update(loss_total, input.size(0))
-        
+
         ### compute gradient and do SGD step
         optimizer.zero_grad()
         loss_total.backward()
@@ -178,9 +170,17 @@ def train(train_loader, model, optimizer, epoch, lr, writer):
             logging.info(msg)
             for k in range(len(losses_meter)):
                 writer.add_scalar('TrainLoss/' + losses_name[k], losses_meter[k].val, epoch*len(train_loader) + i)
+    
+    # Plot last batch of images
+    if (epoch % args.save_val_freq == 0) or (epoch==args.epochs):
+        if imgs_saving_path is not None:
+            n_plot = 3
+            n_input = input.shape[0]
+            idx = np.random.randint(0, n_input, n_plot)
+            input_ = input[idx]
+            plot_results(model, input_, imgs_saving_path, targets=target, only_gt=False)
 
-
-def validate(val_loader, model, epoch, tot_train_samples, writer):
+def validate(val_loader, model, epoch, tot_train_samples, writer, imgs_saving_path=None):
     """Network validation, and computing validation metrics"""
 
     # AverageMeter for statistics
@@ -206,6 +206,13 @@ def validate(val_loader, model, epoch, tot_train_samples, writer):
 
         losses_meter[j+1].update(loss_total, input.size(0))
 
+    # Plot last batch of images
+    if imgs_saving_path is not None:
+        n_plot = 3
+        n_input = input.shape[0]
+        idx = np.random.randint(0, n_input, n_plot)
+        input_ = input[idx]
+        plot_results(model, input_, imgs_saving_path, targets=target, only_gt=False)
 
     msg = (
         'Validation losses:\t' + \
@@ -254,25 +261,28 @@ def main():
             logging.info(f'=> loading checkpoint {args.resume}')
             checkpoint = torch.load(args.resume, map_location=lambda storage, loc: storage)['state_dict']
             model.load_state_dict(checkpoint, strict=False)
-            
+
         else:
             logging.info(f'=> no checkpoint found at {args.resume}')
 
     # step3: data
     # normalize = Normalize(
-    #     mean=[0.498, 0.498, 0.498], 
+    #     mean=[0.498, 0.498, 0.498],
     #     std=[0.229, 0.229, 0.229]
     #     )
     # add_transforms = [normalize]
     add_transforms = []
     train_dataset = dataset_from_datatool(args.datatool_root_dir, args.train_tags, add_transforms)
+    val_dataset = dataset_from_datatool(args.datatool_root_dir, args.val_tags, add_transforms)
+    if args.debug:
+        train_dataset.usable_annotations = train_dataset.usable_annotations[0:args.batch_size]
+        val_dataset.usable_annotations = val_dataset.usable_annotations[0:args.batch_size]
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.workers,
                               shuffle=True, pin_memory=True, drop_last=True)
-    val_dataset = dataset_from_datatool(args.datatool_root_dir, args.val_tags, add_transforms)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, num_workers=args.workers,
-                              shuffle=False, pin_memory=True, drop_last=False)
+                              shuffle=True, pin_memory=True, drop_last=False)
 
-    
+
     # step4: run
     # cudnn.benchmark = True  # TODO
     # if args.test_initial: # if testing the performance from the initial
@@ -285,15 +295,19 @@ def main():
         lr = adjust_learning_rate(optimizer, epoch, args.milestones)
 
         # train for one epoch
-        train(train_loader, model, optimizer, epoch, lr, writer)
-
-        filename = f'{args.snapshot}_checkpoint_epoch_{epoch}.pth.tar'
+        imgs_saving_path = os.path.join(args.ckp_dir, "images_results", "train", f"epoch_{epoch}")
+        train(train_loader, model, optimizer, epoch, lr, writer, imgs_saving_path)
 
         # save checkpoints and current model validation
         if (epoch % args.save_val_freq == 0) or (epoch==args.epochs):
-
+            
+            # Validation
             tot_train_samples = (epoch + 1) * len(train_loader)
-            validate(val_loader, model, epoch, tot_train_samples, writer)
+            imgs_saving_path = os.path.join(args.ckp_dir, "images_results", "val", f"epoch_{epoch}")
+            validate(val_loader, model, epoch, tot_train_samples, writer, imgs_saving_path)
+            
+            # Checkpointing
+            filename = os.path.join(args.ckp_dir, "model_ckpts", f"SynergyNet_ckp_epoch_{epoch}.pth.tar")
             save_checkpoint(
                 {
                     'epoch': epoch,
@@ -301,7 +315,7 @@ def main():
                 },
                 filename
             )
-            # benchmark_pipeline(model) # TODO
+
 
 if __name__ == '__main__':
     main()

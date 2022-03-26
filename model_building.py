@@ -39,27 +39,59 @@ class I2P(nn.Module):
 		_3D_attr, avgpool = self.backbone(input)
 		return _3D_attr, avgpool
 
+def get_bfm_params(bfm_path):
+	# Load model
+	bfm = MorphabelModel(bfm_path)
+
+	# Get additional indices
+	kpt_index = list(bfm.kpt_ind)
+	# Middle left eye
+	kpt_index.append(int((bfm.kpt_ind[43] + bfm.kpt_ind[46])/2))
+	# Middle right eye
+	kpt_index.append(int((bfm.kpt_ind[37] + bfm.kpt_ind[40])/2)-70)
+	# 71 landmark
+	kpt_index.append(int((bfm.kpt_ind[25] + bfm.kpt_ind[26])/2))
+	# 72 landmark
+	kpt_index.append(40424)
+	# 73 landmark
+	kpt_index.append(int((bfm.kpt_ind[18] + bfm.kpt_ind[19])/2))
+	# 74 landmark
+	kpt_index.append(int(bfm.kpt_ind[37]) + 40)
+	# 75 landmark
+	kpt_index.append(int(bfm.kpt_ind[46]) + 20)
+
+	# TODO: Damiano, this is easy but I am tired XD
+	# landmarks3d = image_vertices[kpt_index]
+	# # Middle of eye
+	# middle_eye = (landmarks3d[68] + landmarks3d[69])/2.0
+	# # Center head
+	# center_head = (image_vertices[20000] + image_vertices[34000])/2.0
+	# landmarks3d = np.concatenate([landmarks3d, middle_eye[np.newaxis], center_head[np.newaxis]])
+
+	# Store the base in a tensor type
+	shapeMU = torch.tensor(np.reshape(bfm.model['shapeMU'],[int(3), int(len(bfm.model['shapeMU'])/3)],     'F').T[kpt_index]).unsqueeze(1).cuda()
+	shapePC = torch.tensor(np.reshape(bfm.model['shapePC'],[int(3), int(len(bfm.model['shapePC'])/3), -1], 'F').transpose(1,2,0)[kpt_index]).cuda()
+	expPC   = torch.tensor(np.reshape(bfm.model['expPC'],  [int(3), int(len(bfm.model['expPC'])/3),   -1], 'F').transpose(1,2,0)[kpt_index]).cuda()
+
+	return shapeMU, shapePC, expPC
+
 
 # Main model SynergyNet definition
 class SynergyNet(nn.Module):
 	def __init__(self, args):
 		super(SynergyNet, self).__init__()
-		
-		self.bfm = MorphabelModel('bfm_utils/morphable_models/BFM.mat')
-		# Store the base in a tensor type
-		self.shapeMU = torch.tensor(np.reshape(self.bfm.model['shapeMU'],[int(3), int(len(self.bfm.model['shapeMU'])/3)],     'F').T[self.bfm.kpt_ind]).unsqueeze(1).cuda()
-		self.shapePC = torch.tensor(np.reshape(self.bfm.model['shapePC'],[int(3), int(len(self.bfm.model['shapePC'])/3), -1], 'F').transpose(1,2,0)[self.bfm.kpt_ind]).cuda()
-		self.expPC   = torch.tensor(np.reshape(self.bfm.model['expPC'],  [int(3), int(len(self.bfm.model['expPC'])/3),   -1], 'F').transpose(1,2,0)[self.bfm.kpt_ind]).cuda()
+		bfm_path = 'bfm_utils/morphable_models/BFM.mat'
+		self.shapeMU, self.shapePC, self.expPC = get_bfm_params(bfm_path)
 		self.img_size = args.img_size
 
 		# Image-to-parameter
 		self.I2P = I2P(args)
 
 		# Forward
-		self.forwardDirection = MLP_for(68)
+		self.forwardDirection = MLP_for(args.num_lms)
 
 		# Reverse
-		self.reverseDirection = MLP_rev(68)
+		self.reverseDirection = MLP_rev(args.num_lms)
 
 		# Losses
 		self.LMKLoss_3D = WingLoss()
@@ -111,7 +143,7 @@ class SynergyNet(nn.Module):
 		vertices = self.shapeMU.permute(1,0,2) + (shape_para[...,0] @ self.shapePC + exp_para[...,0] @ self.expPC).permute(1,0,2)
 		R = self.angle2matrix_3ddfa(angles)
 
-		# Get the 68 - 3d landmarks
+		# Get the  3d landmarks
 		landmarks3d = s.unsqueeze(-1).unsqueeze(-1)*torch.bmm(vertices, R.permute(0,2,1)) + t.unsqueeze(1)
 		landmarks3d[:, :, 1] = h - landmarks3d[:, :, 1] + 1
 
