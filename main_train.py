@@ -18,7 +18,6 @@ from utils.ddfa import DDFADataset, ToTensor, Normalize, SGD_NanHandler, CenterC
 from utils.ddfa import str2bool, AverageMeter
 from utils.io import mkdir
 from model_building import SynergyNet as SynergyNet
-# from benchmark_validate import benchmark_pipeline
 
 from data.dataloader_300wlp import dataset_from_datatool
 from torch.utils.tensorboard import SummaryWriter
@@ -47,7 +46,7 @@ def parse_args():
     parser.add_argument('--print-freq', '-p', default=20, type=int)
     parser.add_argument('--resume', default='', type=str, metavar='PATH')
     parser.add_argument('--resume_pose', default='', type=str, metavar='PATH')
-    parser.add_argument('--devices-id', default='0,1', type=str)
+    parser.add_argument('--use-cuda', default='true', type=str2bool)
     parser.add_argument('--root', default='')
     parser.add_argument('--ckp-dir', default='ckpts', type=str)
     parser.add_argument('--log-file', default='output.log', type=str)
@@ -61,6 +60,7 @@ def parse_args():
     parser.add_argument('--save_val_freq', default=10, type=int)
     parser.add_argument('--debug', default='false', type=str2bool)
     parser.add_argument('--num-lms', default=77, type=int)
+    parser.add_argument('--exp-name', default="experiment", type=str)
 
     global args
     args = parser.parse_args()
@@ -68,11 +68,10 @@ def parse_args():
     # some other operations
     args.train_tags = [str(t) for t in args.train_tags.split(',')]
     args.val_tags = [str(t) for t in args.val_tags.split(',')]
-    args.devices_id = [int(d) for d in args.devices_id.split(',')]
     args.milestones = [int(m) for m in args.milestones.split(',')]
 
-    now = datetime.now().strftime("%Hh%Mm%Ss_%d.%m.%Y")
-    args.ckp_dir = os.path.join("ckpts", args.ckp_dir + "_" + now)
+    now = datetime.now().strftime("%d.%m.%Y_%Hh%Mm%Ss")
+    args.ckp_dir = os.path.join(args.ckp_dir, args.exp_name + "_" + now)
     args.log_file = os.path.join(args.ckp_dir, "logs", args.log_file)
     mkdir(args.ckp_dir)
     mkdir(os.path.join(args.ckp_dir, "logs"))
@@ -115,13 +114,16 @@ def save_checkpoint(state, filename='checkpoint.pth.tar'):
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-def parse_target_to_cuda(target):
-    for key in target.keys():
-        target[key].requires_grad = False
-        target[key] = target[key].float().cuda(non_blocking=True)
-    return target
 
-def train(train_loader, model, optimizer, epoch, lr, writer, imgs_saving_path=None):
+def train(
+    train_loader,
+    model,
+    optimizer,
+    epoch,
+    lr,
+    writer,
+    imgs_saving_path=None
+    ):
     """Network training, loss updates, and backward calculation"""
 
     # AverageMeter for statistics
@@ -135,8 +137,6 @@ def train(train_loader, model, optimizer, epoch, lr, writer, imgs_saving_path=No
 
     end = time.time()
     for i, (input, target) in enumerate(train_loader):
-        input = input.cuda(non_blocking=True)
-        target = parse_target_to_cuda(target)
         losses = model(input, target)
 
         data_time.update(time.time() - end)
@@ -180,7 +180,14 @@ def train(train_loader, model, optimizer, epoch, lr, writer, imgs_saving_path=No
             target_ = {k:v[idx] for k,v in target.items()}
             plot_results(model, input_, imgs_saving_path, targets=target_, only_gt=False)
 
-def validate(val_loader, model, epoch, tot_train_samples, writer, imgs_saving_path=None):
+def validate(
+    val_loader,
+    model,
+    epoch,
+    tot_train_samples,
+    writer,
+    imgs_saving_path=None
+    ):
     """Network validation, and computing validation metrics"""
 
     # AverageMeter for statistics
@@ -191,9 +198,6 @@ def validate(val_loader, model, epoch, tot_train_samples, writer, imgs_saving_pa
     model.eval()
 
     for i, (input, target) in enumerate(val_loader):
-
-        input = input.cuda(non_blocking=True)
-        target = parse_target_to_cuda(target)
 
         with torch.no_grad():
             losses  = model(input, target)
@@ -208,11 +212,12 @@ def validate(val_loader, model, epoch, tot_train_samples, writer, imgs_saving_pa
 
     # Plot last batch of images
     if imgs_saving_path is not None:
-        n_plot = 3
+        n_samples = 4
         n_input = input.shape[0]
-        idx = np.random.randint(0, n_input, n_plot)
+        idx = np.random.choice(n_input, n_samples, replace=False)
         input_ = input[idx]
-        plot_results(model, input_, imgs_saving_path, targets=target, only_gt=False)
+        target_ = {k:v[idx] for k,v in target.items()}
+        plot_results(model, input_, imgs_saving_path, targets=target_, only_gt=False)
 
     msg = (
         'Validation losses:\t' + \
@@ -231,7 +236,7 @@ def main():
 
     # logging setup
     logging.basicConfig(
-        format='[%(asctime)s] [p%(process)s] [%(pathname)s:%(lineno)d] [%(levelname)s] %(message)s',
+        format='[%(asctime)s] [%(levelname)s] %(message)s',
         level=logging.INFO,
         handlers=[
             logging.FileHandler(args.log_file, mode=args.log_mode),
@@ -242,10 +247,9 @@ def main():
     print_args(args)  # print args
 
     # step1: define the model structure
+    device = torch.device(f"cuda" if (args.use_cuda and torch.cuda.is_available()) else "cpu")
+    args.device = device
     model = SynergyNet(args)
-    torch.cuda.set_device(args.devices_id[0])
-
-    model = model.cuda()
 
     # step2: optimization: loss and optimization method
 
@@ -277,10 +281,11 @@ def main():
     if args.debug:
         train_dataset.usable_annotations = train_dataset.usable_annotations[0:args.batch_size]
         val_dataset.usable_annotations = val_dataset.usable_annotations[0:args.batch_size]
+    pin_memory = (args.device.type == "gpu")
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.workers,
-                              shuffle=True, pin_memory=True, drop_last=True)
+                              shuffle=True, pin_memory=pin_memory, drop_last=True)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, num_workers=args.workers,
-                              shuffle=True, pin_memory=True, drop_last=False)
+                              shuffle=True, pin_memory=pin_memory, drop_last=False)
 
 
     # step4: run
@@ -288,7 +293,7 @@ def main():
     # if args.test_initial: # if testing the performance from the initial
     #     logging.info('Testing from initial')
     #     benchmark_pipeline(model)  # TODO
-    writer = SummaryWriter()
+    writer = SummaryWriter(log_dir=os.path.join(args.ckp_dir, "tb_runs"))
 
     for epoch in range(args.start_epoch, args.epochs + 1):
         # adjust learning rate
@@ -296,7 +301,15 @@ def main():
 
         # train for one epoch
         imgs_saving_path = os.path.join(args.ckp_dir, "images_results", "train", f"epoch_{epoch}")
-        train(train_loader, model, optimizer, epoch, lr, writer, imgs_saving_path)
+        train(
+            train_loader,
+            model,
+            optimizer,
+            epoch,
+            lr,
+            writer,
+            imgs_saving_path
+        )
 
         # save checkpoints and current model validation
         if (epoch % args.save_val_freq == 0) or (epoch==args.epochs):
@@ -304,7 +317,14 @@ def main():
             # Validation
             tot_train_samples = (epoch + 1) * len(train_loader)
             imgs_saving_path = os.path.join(args.ckp_dir, "images_results", "val", f"epoch_{epoch}")
-            validate(val_loader, model, epoch, tot_train_samples, writer, imgs_saving_path)
+            validate(
+                val_loader,
+                model,
+                epoch,
+                tot_train_samples,
+                writer,
+                imgs_saving_path
+            )
 
             # Checkpointing
             filename = os.path.join(args.ckp_dir, "model_ckpts", f"SynergyNet_ckp_epoch_{epoch}.pth.tar")

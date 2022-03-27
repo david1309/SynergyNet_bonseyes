@@ -26,7 +26,7 @@ class I2P(nn.Module):
 		if 'mobilenet_v2' in self.args.arch:
 			self.backbone = getattr(mobilenetv2_backbone, args.arch)(pretrained=False)
 		elif 'mobilenet' in self.args.arch:
-			self.backbone = getattr(mobilenetv1_backbone, args.arch)()		
+			self.backbone = getattr(mobilenetv1_backbone, args.arch)()
 		elif 'resnet' in self.args.arch:
 			self.backbone = getattr(resnet_backbone, args.arch)(pretrained=False)
 		elif 'ghostnet' in self.args.arch:
@@ -64,9 +64,9 @@ def get_bfm_params(bfm_path):
 	kpt_index.append(34000)
 
 	# Store the base in a tensor type
-	shapeMU = torch.tensor(np.reshape(bfm.model['shapeMU'],[int(3), int(len(bfm.model['shapeMU'])/3)],     'F').T[kpt_index]).unsqueeze(1).cuda()
-	shapePC = torch.tensor(np.reshape(bfm.model['shapePC'],[int(3), int(len(bfm.model['shapePC'])/3), -1], 'F').transpose(1,2,0)[kpt_index]).cuda()
-	expPC   = torch.tensor(np.reshape(bfm.model['expPC'],  [int(3), int(len(bfm.model['expPC'])/3),   -1], 'F').transpose(1,2,0)[kpt_index]).cuda()
+	shapeMU = torch.tensor(np.reshape(bfm.model['shapeMU'],[int(3), int(len(bfm.model['shapeMU'])/3)],     'F').T[kpt_index]).unsqueeze(1)
+	shapePC = torch.tensor(np.reshape(bfm.model['shapePC'],[int(3), int(len(bfm.model['shapePC'])/3), -1], 'F').transpose(1,2,0)[kpt_index])
+	expPC   = torch.tensor(np.reshape(bfm.model['expPC'],  [int(3), int(len(bfm.model['expPC'])/3),   -1], 'F').transpose(1,2,0)[kpt_index])
 
 	return shapeMU, shapePC, expPC
 
@@ -75,12 +75,20 @@ def get_bfm_params(bfm_path):
 class SynergyNet(nn.Module):
 	def __init__(self, args):
 		super(SynergyNet, self).__init__()
-		bfm_path = 'bfm_utils/morphable_models/BFM.mat'
-		self.shapeMU, self.shapePC, self.expPC = get_bfm_params(bfm_path)
+
+		# General config
 		self.img_size = args.img_size
+		self.device = args.device
+
+		# Morphable model parameters
+		bfm_path = 'bfm_utils/morphable_models/BFM.mat'
+		shapeMU, shapePC, expPC = get_bfm_params(bfm_path)
+		self.shapeMU = shapeMU.to(self.device)
+		self.shapePC = shapePC.to(self.device)
+		self.expPC = expPC.to(self.device)
 
 		# Image-to-parameter
-		self.I2P = I2P(args)
+		self.I2P = I2P(args)  # next(self.I2P.parameters()).device  # check if parameters are in device
 
 		# Forward
 		self.forwardDirection = MLP_for(args.num_lms)
@@ -99,11 +107,13 @@ class SynergyNet(nn.Module):
 			'loss_param_s1s2': 0.0,
 			}
 
+		self.to(self.device)
+
 	def angle2matrix_3ddfa(self, angles):
 		x, y, z = angles[:, 0], angles[:, 1], angles[:, 2]
-		tensor_0 = torch.zeros_like(x).cuda()
+		tensor_0 = torch.zeros_like(x).to(self.device)
 		tensor_1 = tensor_0 + 1
-        
+
 		# x
 		Rx=torch.stack([
 					torch.stack([tensor_1,      tensor_0,      tensor_0]),
@@ -122,7 +132,6 @@ class SynergyNet(nn.Module):
 		R = torch.bmm(Rx, Ry)
 		R = torch.bmm(R,  Rz)
 		return R
-
 
 	def lm_from_params(self, pose_para, shape_para, exp_para, h):
 		# Get parameters
@@ -152,14 +161,20 @@ class SynergyNet(nn.Module):
 
 		return landmarks3d
 
+	def parse_target_to_device(self, target):
+		for key in target.keys():
+			target[key].requires_grad = False
+			target[key] = target[key].float().to(self.device, non_blocking=True)
+		return target
+
 	@staticmethod
 	def parse_target_params(target):
 		pose = target["pose_params"]
 		shape = target["shape_params"]
 		exp = target["exp_params"]
 
-		return torch.cat((pose, shape, exp), 1).type(torch.cuda.FloatTensor)
-	
+		return torch.cat((pose, shape, exp), 1)
+
 	@staticmethod
 	def parse_pred_params(pred):
 		"""
@@ -172,8 +187,12 @@ class SynergyNet(nn.Module):
 		exp_para = pred[:, 199+7: 199+7+29].reshape(-1, 29, 1)
 
 		return pose_para, shape_para, exp_para
-		
+
 	def forward(self, input, target):
+		# General config
+		input = input.to(self.device, non_blocking=True)
+		target = self.parse_target_to_device(target)
+
 		# Image to 3DMM Parameters
 		_3D_attr, avgpool = self.I2P(input)
 		_3D_attr_GT = self.parse_target_params(target)
@@ -182,9 +201,9 @@ class SynergyNet(nn.Module):
 		vertex_GT_lmk = target["lm3d"].permute(0, 2, 1)
 		# gt = self.lm_from_params(target["pose_params"].unsqueeze(-1), target["shape_params"].unsqueeze(-1), target["exp_params"].unsqueeze(-1), input.shape[2])
 
-		self.loss['loss_lmk_s1'] = 0.05 * self.LMKLoss_3D(vertex_lmk, vertex_GT_lmk)		
+		self.loss['loss_lmk_s1'] = 0.05 * self.LMKLoss_3D(vertex_lmk, vertex_GT_lmk)
 		self.loss['loss_param_s1'] = 0.02 * self.ParamLoss(_3D_attr, _3D_attr_GT)
-		
+
 		# Coarse landmarks to Refined landmarks
 		point_residual = self.forwardDirection(vertex_lmk, avgpool, shape_para, exp_para)
 		vertex_lmk = vertex_lmk + point_residual  # Refined landmarks: Lr = Lc + L_residual
@@ -199,6 +218,9 @@ class SynergyNet(nn.Module):
 
 	def forward_test(self, input):
 		"""test time forward"""
+		# General config
+		input = input.to(self.device, non_blocking=True)
+
 		with torch.no_grad():
 			# Image to 3DMM Parameters
 			_3D_attr, avgpool = self.I2P.forward(input)
@@ -209,7 +231,7 @@ class SynergyNet(nn.Module):
 			point_residual = self.forwardDirection(vertex_lmk, avgpool, shape_para, exp_para)
 			vertex_lmk = vertex_lmk + point_residual  # Refined landmarks: Lr = Lc + L_residual
 
-		return vertex_lmk, pose_para, shape_para, exp_para 
+		return vertex_lmk, pose_para, shape_para, exp_para
 
 	def get_losses(self):
 		return self.loss.keys()

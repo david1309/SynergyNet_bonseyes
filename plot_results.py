@@ -18,15 +18,15 @@ to_np = lambda tensor: tensor.detach().cpu().numpy()
 to_nps = lambda tensors: [to_np(t) for t in tensors]
 
 def _draw_3d_axis(
-    img, 
-    yaw, 
-    pitch, 
-    roll, 
-    tdx=None, 
-    tdy=None, 
+    img,
+    yaw,
+    pitch,
+    roll,
+    tdx=None,
+    tdy=None,
     lm=None,
     ax_colors=None,
-    size=100, 
+    size=100,
     ):
     if (tdx is None) or (tdy is None):
         tdx = lm[0,30]
@@ -67,8 +67,8 @@ def _plot_lms(plotter, lm_3d, lm_color = (255, 150, 0)):
         num_lm = lm_3d.shape[1]
         for i in range(num_lm):
             lms.append({
-                'idx': i, 
-                'x': lm_3d[0, i], 
+                'idx': i,
+                'x': lm_3d[0, i],
                 'y': lm_3d[1, i]
                 })
 
@@ -86,9 +86,9 @@ def _plot_head_pose(plotter, head_pose, lm_3d, ax_colors=None):
     roll = head_pose[2]  # blue
 
     plotter.image = _draw_3d_axis(
-        plotter.image, 
-        yaw, 
-        pitch, 
+        plotter.image,
+        yaw,
+        pitch,
         roll,
         lm=lm_3d,
         ax_colors=ax_colors
@@ -98,7 +98,7 @@ def plot_results(model, images, saving_path, targets=None, only_gt=False):
     if targets is None and only_gt:
         raise ValueError("Can't set only_gt=True without providing GT targets")
     # Get models predictions
-    lms_3d, pose_para, shape_para, exp_para = model.forward_test(images.cuda(non_blocking=True))
+    lms_3d, pose_para, shape_para, exp_para = model.forward_test(images)
     lms_3d, pose_para, shape_para, exp_para = to_nps([lms_3d, pose_para, shape_para, exp_para])
 
     # Get GT's
@@ -146,43 +146,48 @@ def plot_results(model, images, saving_path, targets=None, only_gt=False):
 
 if __name__ == '__main__':
     # Config Other
+    args = namedtuple("args", ["use_cuda", "arch", "img_size", "num_lms"])
     only_gt = True
+    args.use_cuda = True
 
     # Config Model
-    args = namedtuple("args", ["arch", "img_size", "devices_id", "num_lms"])
     args.arch = "mobilenet_v2"
     args.img_size = 450
-    args.devices_id = [0]
     args.num_lms = 77
-    
-    ckp_epoch = 10
-    ckp_date = "ckpts_01h49m33s_26.03.2022"
-    ckp_path = f"ckpts/{ckp_date}/model_ckpts/SynergyNet_ckp_epoch_{ckp_epoch}.pth.tar"
+
+    ckp_epoch = 15
+    ckp_name = "ckpts_10h22m37s_27.03.2022"
+    ckp_path = f"ckpts/{ckp_name}/model_ckpts/SynergyNet_ckp_epoch_{ckp_epoch}.pth.tar"
 
     # Config Data Loader
-    datatool_root_dir = "/hdd1/datasets/300W_LP/output_debug/" 
+    datatool_root_dir = "/hdd1/datasets/300W_LP/output_debug_all/"
     tags = ["IBUG"]
     add_transforms = []
     batch_size = 16
     workers = 4
 
     # Build objects and plot
+    print(f">>> Loading model from '{ckp_path}' ...")
+    device = torch.device(f"cuda" if (args.use_cuda and torch.cuda.is_available()) else "cpu")
+    args.device = device
     model = SynergyNet(args)
     checkpoint = torch.load(ckp_path, map_location=lambda storage, loc: storage)['state_dict']
     model.load_state_dict(checkpoint, strict=False)
-    torch.cuda.set_device(args.devices_id[0])
-    model = model.cuda()
 
+    print(f">>> Loading data tool from '{datatool_root_dir}' ...")
     dataset = dataset_from_datatool(datatool_root_dir, tags, add_transforms)
+    pin_memory = (args.device.type == "gpu")
     data_loader = DataLoader(dataset, batch_size=batch_size, num_workers=workers,
-                              shuffle=False, pin_memory=True, drop_last=False)
+                              shuffle=True, pin_memory=True, drop_last=False)
 
     images, targets = next(iter(data_loader))
-    saving_path = f"ckpts/{ckp_date}/images_results_test"
+    saving_path = f"ckpts/{ckp_name}/images_results_test"
+    print(f">>> Plotting images ...")
     plot_results(
-        model, 
-        images, 
-        saving_path, 
-        targets=targets, 
+        model,
+        images,
+        saving_path,
+        targets=targets,
         only_gt=only_gt
         )
+    print(f">>> Images stored in '{saving_path}")
