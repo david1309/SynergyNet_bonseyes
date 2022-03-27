@@ -190,6 +190,8 @@ class SynergyNet(nn.Module):
 
 	def forward(self, input, target):
 		# General config
+		param_loss_factor = 100 * 1
+		param_diff_loss_factor = 100 * 1
 		input = input.to(self.device, non_blocking=True)
 		target = self.parse_target_to_device(target)
 
@@ -202,7 +204,7 @@ class SynergyNet(nn.Module):
 		# gt = self.lm_from_params(target["pose_params"].unsqueeze(-1), target["shape_params"].unsqueeze(-1), target["exp_params"].unsqueeze(-1), input.shape[2])
 
 		self.loss['loss_lmk_s1'] = 0.05 * self.LMKLoss_3D(vertex_lmk, vertex_GT_lmk)
-		self.loss['loss_param_s1'] = 0.02 * self.ParamLoss(_3D_attr, _3D_attr_GT)
+		self.loss['loss_param_s1'] = 0.02 * param_loss_factor * self.ParamLoss(_3D_attr, _3D_attr_GT)
 
 		# Coarse landmarks to Refined landmarks
 		point_residual = self.forwardDirection(vertex_lmk, avgpool, shape_para, exp_para)
@@ -211,8 +213,8 @@ class SynergyNet(nn.Module):
 
 		# Refined landmarks to 3DMM parameters
 		_3D_attr_S2 = self.reverseDirection(vertex_lmk)
-		self.loss['loss_param_s2'] = 0.02 * self.ParamLoss(_3D_attr_S2, _3D_attr_GT, mode='only_3dmm')
-		self.loss['loss_param_s1s2'] = 0.001 * self.ParamLoss(_3D_attr_S2, _3D_attr, mode='only_3dmm')
+		self.loss['loss_param_s2'] = 0.02 * param_loss_factor * self.ParamLoss(_3D_attr_S2, _3D_attr_GT, mode='only_3dmm')
+		self.loss['loss_param_s1s2'] = 0.02 * param_diff_loss_factor * self.ParamLoss(_3D_attr_S2, _3D_attr, mode='only_3dmm')  # 0.001
 
 		return self.loss
 

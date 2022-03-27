@@ -53,11 +53,9 @@ def parse_args():
     parser.add_argument('--log-mode', default='w', type=str)
     parser.add_argument('--arch', default='mobilenet_v2', type=str, help="Please choose [mobilenet_v2, mobilenet_1, resnet50, resnet101, or ghostnet]")
     parser.add_argument('--milestones', default='15,25,30', type=str)
-    parser.add_argument('--task', default='all', type=str)
-    parser.add_argument('--test_initial', default='false', type=str2bool)
     parser.add_argument('--warmup', default=-1, type=int)
     parser.add_argument('--img_size', default=450, type=int)
-    parser.add_argument('--save_val_freq', default=10, type=int)
+    parser.add_argument('--save-val-freq', default=10, type=int)
     parser.add_argument('--debug', default='false', type=str2bool)
     parser.add_argument('--num-lms', default=77, type=int)
     parser.add_argument('--exp-name', default="experiment", type=str)
@@ -287,12 +285,10 @@ def main():
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, num_workers=args.workers,
                               shuffle=True, pin_memory=pin_memory, drop_last=False)
 
+    logging.info(f"Num. training samples: {len(train_dataset)} ({len(train_loader)} batches)")
+    logging.info(f"Num. validation samples: {len(val_dataset)} ({len(val_loader)} batches)")
 
     # step4: run
-    # cudnn.benchmark = True  # TODO
-    # if args.test_initial: # if testing the performance from the initial
-    #     logging.info('Testing from initial')
-    #     benchmark_pipeline(model)  # TODO
     writer = SummaryWriter(log_dir=os.path.join(args.ckp_dir, "tb_runs"))
 
     for epoch in range(args.start_epoch, args.epochs + 1):
