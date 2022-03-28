@@ -12,7 +12,7 @@ from backbone_nets import resnet_backbone
 from backbone_nets import mobilenetv1_backbone
 from backbone_nets import mobilenetv2_backbone
 from backbone_nets import ghostnet_backbone
-from backbone_nets.pointnet_backbone import MLP_for, MLP_rev
+from backbone_nets.pointnet_backbone import MLP_for, MLP_rev, MLP_rot_inv_for, MLP_rot_inv_rev
 from loss_definition import ParamLoss, WingLoss
 
 from bfm_utils.morphabel_model import MorphabelModel
@@ -92,10 +92,17 @@ class SynergyNet(nn.Module):
 		self.I2P = I2P(args)  # next(self.I2P.parameters()).device  # check if parameters are in device
 
 		# Forward
-		self.forwardDirection = MLP_for(args.num_lms)
+		if args.use_rot_inv:
+			self.forwardDirection = MLP_rot_inv_for(args.num_lms)
+		else:
+			self.forwardDirection = MLP_for(args.num_lms)
 
 		# Reverse
-		self.reverseDirection = MLP_rev(args.num_lms)
+		# Forward
+		if args.use_rot_inv:
+			self.reverseDirection = MLP_rev(args.num_lms)
+		else:
+			self.reverseDirection = MLP_rev(args.num_lms)
 
 		# Losses
 		self.LMKLoss_3D = WingLoss()
