@@ -19,7 +19,9 @@ from utils.ddfa import str2bool, AverageMeter
 from utils.io import mkdir
 from model_building import SynergyNet as SynergyNet
 
-from data.dataloader_300wlp import dataset_from_datatool
+from data.dataloader_300wlp import dataset_from_datatool as dataset_from_datatool_300wlp
+from data.dataloader_AFLW2000 import dataset_from_datatool as dataset_from_datatool_AFLW2000
+
 from torch.utils.tensorboard import SummaryWriter
 from plot_results import plot_results
 from datetime import datetime
@@ -60,6 +62,7 @@ def parse_args():
     parser.add_argument('--crop-images', default="false", type=str2bool)
     parser.add_argument('--use-rot-inv', default="false", type=str2bool)
     parser.add_argument('--bfm-path', default="bfm_utils/morphable_models/BFM.mat", type=str)
+    parser.add_argument('--use-300wlp', default="false", type=str2bool)
     
     args = parser.parse_args()
 
@@ -277,6 +280,10 @@ def main(args):
     #     )
     # add_transforms = [normalize]
     add_transforms = []
+    if args.use_300wlp:
+        dataset_from_datatool = dataset_from_datatool_300wlp
+    else:
+        dataset_from_datatool = dataset_from_datatool_AFLW2000
     train_dataset = dataset_from_datatool(args.datatool_root_dir, args.train_tags, add_transforms)
     val_dataset = dataset_from_datatool(args.datatool_root_dir, args.val_tags, add_transforms)
     if args.debug:
