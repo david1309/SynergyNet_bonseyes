@@ -58,6 +58,7 @@ def parse_args():
     parser.add_argument('--num-lms', default=77, type=int)
     parser.add_argument('--exp-name', default="experiment", type=str)
     parser.add_argument('--crop-images', default="false", type=str2bool)
+    parser.add_argument('--use-rot-inv', default=False, type=bool)
 
     global args
     args = parser.parse_args()
