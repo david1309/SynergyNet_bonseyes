@@ -38,7 +38,6 @@ def parse_args():
     parser.add_argument('--epochs', default=40, type=int)
     parser.add_argument('--start-epoch', default=1, type=int)
     parser.add_argument('-b', '--batch-size', default=128, type=int)
-    parser.add_argument('-vb', '--val-batch-size', default=32, type=int)
     parser.add_argument('--base-lr', '--learning-rate', default=0.001, type=float)
     parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                         help='momentum')

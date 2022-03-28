@@ -8,14 +8,14 @@ python3 main_train.py \
     --val-tags="IBUG" \
     \
     --debug=False \
-    --exp-name="loss_weights_100" \
+    --exp-name="loss_weights_100_HELEN_crop" \
     --use-cuda=True \
     --crop-images=False \
     \
     --epochs=10 \
     --batch-size=16 \
     --base-lr=0.00001\
-    --milestones=5,8 \
+    --milestones=6,8 \
     --save-val-freq=2 \
     --num-lms=77 \
     \
