@@ -1,21 +1,22 @@
 #!/usr/bin/env bash
 #"LFPW,LFPW_Flip,HELEN,HELEN_Flip"
-#"IBUG,IBUG_Flip,AFW,AFW_Flip"
+# AFW,AFW_Flip
+#"IBUG,IBUG_Flip"
 
 python3 main_train.py \
-    --datatool-root-dir="/hdd1/datasets/300W_LP/output_debug_all/" \
-    --train-tags="HELEN" \
-    --val-tags="IBUG" \
+    --datatool-root-dir="/root/300wlp/" \
+    --train-tags="LFPW,LFPW_Flip,HELEN,HELEN_Flip" \
+    --val-tags="IBUG,AFW" \
     \
     --debug=False \
-    --exp-name="loss_weights_100_HELEN_crop" \
+    --exp-name="loss_weight_100_all" \
     --use-cuda=True \
     --crop-images=False \
     \
-    --epochs=10 \
-    --batch-size=16 \
-    --base-lr=0.00001\
-    --milestones=6,8 \
+    --epochs=50 \
+    --batch-size=128 \
+    --base-lr=0.0001\
+    --milestones=40,45 \
     --save-val-freq=2 \
     --num-lms=77 \
     \

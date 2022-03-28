@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 from utils.plot import plotUtils
 from model_building import SynergyNet
 from data.dataloader_300wlp import dataset_from_datatool
+import time
 
 to_np = lambda tensor: tensor.detach().cpu().numpy()
 to_nps = lambda tensors: [to_np(t) for t in tensors]
@@ -53,6 +54,7 @@ def draw_landmarks(img, pts, color, saving_path):
                         markeredgecolor=markeredgecolor, alpha=alpha)
     plt.tight_layout(pad=0)
     plt.savefig(saving_path, dpi=200)
+    time.sleep(1.25)
     image = cv2.imread(saving_path)
     image = cv2.resize(image, dsize=(height, width), interpolation=cv2.INTER_CUBIC)
     os.remove(saving_path)
@@ -166,8 +168,10 @@ def plot_results(
 
     # Get models predictions
     if not only_gt:
-        lms_3d, pose_para = model.forward_test(images, bbox)
-        lms_3d, pose_para = to_nps([lms_3d, pose_para])
+        model.eval()
+        with torch.no_grad():
+            lms_3d, pose_para = model.forward_test(images, bbox)
+            lms_3d, pose_para = to_nps([lms_3d, pose_para])
 
     # Plots predictions and GT
     if os.path.exists(saving_path):
@@ -207,24 +211,29 @@ def plot_results(
 
 if __name__ == '__main__':
     # Config General
-    args = namedtuple("args", ["use_cuda", "arch", "img_size", "num_lms", "crop_images"])
+    args = namedtuple("args", ["use_cuda", "arch", "img_size", "num_lms", "crop_images", "use_rot_inv"])
     only_gt = False
-    args.use_cuda = False
+    args.use_rot_inv = False
+    args.use_cuda = True
     args.crop_images = False
-    lm_with_lines = False
+    lm_with_lines = True
+
+    seed = 13
+    np.random.seed(seed)
+    torch.manual_seed(seed)
 
     # Config Model
     args.arch = "mobilenet_v2"
     args.img_size = 450
     args.num_lms = 77
 
-    ckp_epoch = 15
-    ckp_name = "ckpts_10h22m37s_27.03.2022"
+    ckp_epoch = 20
+    ckp_name = "loss_weight_100_not_HELEN_28.03.2022_12h17m30s"
     ckp_path = f"ckpts/{ckp_name}/model_ckpts/SynergyNet_ckp_epoch_{ckp_epoch}.pth.tar"
 
     # Config Data Loader
-    datatool_root_dir = "/hdd1/datasets/300W_LP/output_debug_all/"
-    tags = ["IBUG"]
+    datatool_root_dir = "/root/300wlp/"
+    tags = ["LFPW"]
     add_transforms = []
     batch_size = 16
     workers = 4
@@ -242,7 +251,7 @@ if __name__ == '__main__':
         checkpoint = torch.load(ckp_path, map_location=lambda storage, loc: storage)['state_dict']
         model.load_state_dict(checkpoint, strict=False)
 
-    print(f">>> Loading data tool from '{datatool_root_dir}' ...")
+    print(f">>> Loading data tool from '{datatool_root_dir}' with tags {tags} ...")
     dataset = dataset_from_datatool(datatool_root_dir, tags, add_transforms)
     data_loader = DataLoader(dataset, batch_size=batch_size, num_workers=workers,
                               shuffle=True, pin_memory=pin_memory, drop_last=False)

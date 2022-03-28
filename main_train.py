@@ -180,7 +180,7 @@ def train(
                 model, 
                 input_, 
                 imgs_saving_path, 
-                lm_with_lines=True,
+                lm_with_lines=False,
                 targets=target_, 
                 only_gt=False
                 )
@@ -226,7 +226,7 @@ def validate(
             model, 
             input_, 
             imgs_saving_path, 
-            lm_with_lines=True,
+            lm_with_lines=False,
             targets=target_, 
             only_gt=False
             )
