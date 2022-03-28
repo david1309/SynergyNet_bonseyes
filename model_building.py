@@ -82,7 +82,7 @@ class SynergyNet(nn.Module):
 		self.crop_images = args.crop_images
 
 		# Morphable model parameters
-		bfm_path = 'bfm_utils/morphable_models/BFM.mat'
+		bfm_path = args.bfm_path
 		shapeMU, shapePC, expPC = get_bfm_params(bfm_path)
 		self.shapeMU = shapeMU.to(self.device)
 		self.shapePC = shapePC.to(self.device)

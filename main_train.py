@@ -58,22 +58,12 @@ def parse_args():
     parser.add_argument('--num-lms', default=77, type=int)
     parser.add_argument('--exp-name', default="experiment", type=str)
     parser.add_argument('--crop-images', default="false", type=str2bool)
-    parser.add_argument('--use-rot-inv', default=False, type=bool)
-
-    global args
+    parser.add_argument('--use-rot-inv', default="false", type=str2bool)
+    parser.add_argument('--bfm-path', default="bfm_utils/morphable_models/BFM.mat", type=str)
+    
     args = parser.parse_args()
 
-    # some other operations
-    args.train_tags = [str(t) for t in args.train_tags.split(',')]
-    args.val_tags = [str(t) for t in args.val_tags.split(',')]
-    args.milestones = [int(m) for m in args.milestones.split(',')]
-
-    now = datetime.now().strftime("%d.%m.%Y_%Hh%Mm%Ss")
-    args.ckp_dir = os.path.join(args.ckp_dir, args.exp_name + "_" + now)
-    args.log_file = os.path.join(args.ckp_dir, "logs", args.log_file)
-    mkdir(args.ckp_dir)
-    mkdir(os.path.join(args.ckp_dir, "logs"))
-    mkdir(os.path.join(args.ckp_dir, "model_ckpts"))
+    return args
 
 
 
@@ -242,9 +232,8 @@ def validate(
     for k in range(len(losses_meter)):
         writer.add_scalar('ValLoss/' + losses_name[k], losses_meter[k].val, tot_train_samples)
 
-def main():
+def main(args):
     """ Main funtion for the training process"""
-    parse_args()  # parse global argsl
 
     # logging setup
     logging.basicConfig(
@@ -348,4 +337,16 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    args = parse_args()  # parse global argsl
+    # some other operations
+    args.train_tags = [str(t) for t in args.train_tags.split(',')]
+    args.val_tags = [str(t) for t in args.val_tags.split(',')]
+    args.milestones = [int(m) for m in args.milestones.split(',')]
+
+    now = datetime.now().strftime("%d.%m.%Y_%Hh%Mm%Ss")
+    args.ckp_dir = os.path.join(args.ckp_dir, args.exp_name + "_" + now)
+    args.log_file = os.path.join(args.ckp_dir, "logs", args.log_file)
+    mkdir(args.ckp_dir)
+    mkdir(os.path.join(args.ckp_dir, "logs"))
+    mkdir(os.path.join(args.ckp_dir, "model_ckpts"))
+    main(args)
