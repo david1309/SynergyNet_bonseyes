@@ -198,9 +198,10 @@ class SynergyNet(nn.Module):
 					valid_samples.append(i)
 					resize = transforms.Resize((self.img_size, self.img_size))
 					input[i] = resize(input_i)
+			
+			input = input[valid_samples]
 
-
-		return input[valid_samples].to(self.device, non_blocking=True)
+		return input.to(self.device, non_blocking=True)
 
 	def process_target(self, target):
 		for key in target.keys():
