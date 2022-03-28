@@ -174,11 +174,13 @@ def plot_results(
             lms_3d, pose_para = to_nps([lms_3d, pose_para])
 
     # Plots predictions and GT
-    if os.path.exists(saving_path):
-        shutil.rmtree(saving_path)
-    Path(saving_path).mkdir(parents=True, exist_ok=True)
+    if saving_path is not None:
+        if os.path.exists(saving_path):
+            shutil.rmtree(saving_path)
+        Path(saving_path).mkdir(parents=True, exist_ok=True)
 
     num_im = images.shape[0]
+    images_plotted = np.zeros_like(images)
     for i in range(num_im):
         image = ToPILImage()(images[i])
         image = np.array(image)[:,:,::-1].copy()
@@ -204,9 +206,16 @@ def plot_results(
             ax_colors = [(0,0,90), (0,90,0), (90,0,0)] # BGR scale
             _plot_head_pose(plotter, head_pose_gt, lm_3d_gt, ax_colors)
 
-        # Store plots
-        output_path = os.path.join(saving_path, f"sample_{i}.jpg")
-        plotter.save(output_path)
+        # Store images and save plots
+        images_plotted[i] = plotter.image.T
+
+        if saving_path is not None:
+            output_path = os.path.join(saving_path, f"sample_{i}.jpg")
+            plotter.save(output_path)
+            
+    images_plotted = np.transpose(images_plotted, (0, 3, 2, 1)) # (batch, h, w, c)
+    return images_plotted
+            
 
 
 if __name__ == '__main__':
@@ -214,7 +223,7 @@ if __name__ == '__main__':
     args = namedtuple("args", ["use_cuda", "arch", "img_size", "num_lms", "crop_images", "use_rot_inv"])
     only_gt = False
     args.use_rot_inv = False
-    args.use_cuda = True
+    args.use_cuda = False
     args.crop_images = False
     lm_with_lines = True
 
@@ -233,7 +242,7 @@ if __name__ == '__main__':
 
     # Config Data Loader
     datatool_root_dir = "/root/300wlp/"
-    tags = ["LFPW"]
+    tags = ["IBUG"]
     add_transforms = []
     batch_size = 16
     workers = 4
@@ -259,6 +268,7 @@ if __name__ == '__main__':
     # Plot images
     images, targets = next(iter(data_loader))
     saving_path = f"ckpts/{ckp_name}/images_results_test"
+    saving_path = None
     print(f">>> Plotting images ...")
     plot_results(
         model,

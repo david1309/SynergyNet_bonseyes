@@ -13,10 +13,10 @@ python3 main_train.py \
     --use-cuda=True \
     --crop-images=False \
     \
-    --epochs=50 \
+    --epochs=100 \
     --batch-size=128 \
     --base-lr=0.0001\
-    --milestones=40,45 \
+    --milestones=80,90 \
     --save-val-freq=2 \
     --num-lms=77 \
     \
