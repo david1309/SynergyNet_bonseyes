@@ -173,12 +173,10 @@ class ResNet(nn.Module):
 
         #self.fc = nn.Linear(512 * block.expansion, num_classes)
 
-        self.num_texture = 40
-        self.num_ori = 12
-        self.num_shape = 40
-        self.num_exp = 10
+        self.num_ori = 7
+        self.num_shape = 199
+        self.num_exp = 29
 
-        self.fc_tex = nn.Linear(512 * block.expansion, self.num_texture)
         self.fc_ori = nn.Linear(512 * block.expansion, self.num_ori)
         self.fc_shape = nn.Linear(512 * block.expansion, self.num_shape)
         self.fc_exp = nn.Linear(512 * block.expansion, self.num_exp)
@@ -237,16 +235,17 @@ class ResNet(nn.Module):
         x = self.layer4(x)
 
         x = self.avgpool(x)
+        
         x = torch.flatten(x, 1)
+        pool_x = x.clone()
 
-        x_tex = self.fc_tex(x)
         x_ori = self.fc_ori(x)
         x_shape = self.fc_shape(x)
         x_exp = self.fc_exp(x)
-        x = torch.cat((x_ori, x_shape, x_exp, x_tex), dim=1)
+        x = torch.cat((x_ori, x_shape, x_exp), dim=1)
         
         #x = self.fc(x)
-        return x 
+        return x, pool_x
 
         
 

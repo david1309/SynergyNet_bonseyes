@@ -13,7 +13,7 @@ class MLP_for(nn.Module):
 		self.conv3 = torch.nn.Conv1d(64,64,1)
 		self.conv4 = torch.nn.Conv1d(64,128,1)
 		self.conv5 = torch.nn.Conv1d(128,1024,1)
-		self.conv6 = nn.Conv1d(2596, 512, 1) 
+		self.conv6 = nn.Conv1d(3364, 512, 1) 
 		self.conv7 = nn.Conv1d(512, 256, 1)
 		self.conv8 = nn.Conv1d(256, 128, 1)
 		self.conv9 = nn.Conv1d(128, 3, 1)
