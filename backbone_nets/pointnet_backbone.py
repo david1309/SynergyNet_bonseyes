@@ -69,30 +69,30 @@ class MLP_rot_inv_for(nn.Module):
 	def __init__(self, num_pts):
 		super(MLP_rot_inv_for,self).__init__()
 		self.conv1 = VNLinearLeakyReLU(1,64, negative_slope=0.0)
-		#self.conv2 = VNLinearLeakyReLU(64,64, negative_slope=0.0)
-		#self.conv3 = VNLinearLeakyReLU(64,64, negative_slope=0.0)
-		#self.conv4 = VNLinearLeakyReLU(64,128, negative_slope=0.0)
-		#self.conv5 = VNLinearLeakyReLU(128,1024, negative_slope=0.0)
+		self.conv2 = VNLinearLeakyReLU(64,64, negative_slope=0.0)
+		self.conv3 = VNLinearLeakyReLU(64,64, negative_slope=0.0)
+		self.conv4 = VNLinearLeakyReLU(64,128, negative_slope=0.0)
+		self.conv5 = VNLinearLeakyReLU(128,512, negative_slope=0.0)
 		#self.conv6 = VNLinearLeakyReLU(2596, 512, negative_slope=0.0)
 		#self.conv7 = VNLinearLeakyReLU(512, 256, negative_slope=0.0)
 		#self.conv8 = VNLinearLeakyReLU(256, 128, negative_slope=0.0)
 		#self.conv9 = VNLinearLeakyReLU(128, 1, negative_slope=0.0)
 		#self.num_pts = num_pts
-		#self.max_pool = VNMaxPool(1024)
+		#self.max_pool = VNMaxPool(512)
 
-		self.conv2 = torch.nn.Conv1d(192,64,1)
-		self.conv3 = torch.nn.Conv1d(64,64,1)
-		self.conv4 = torch.nn.Conv1d(64,128,1)
-		self.conv5 = torch.nn.Conv1d(128,1024,1)
-		self.conv6 = nn.Conv1d(2596, 512, 1) 
+		#self.conv2 = torch.nn.Conv1d(192,64,1)
+		#self.conv3 = torch.nn.Conv1d(64,64,1)
+		#self.conv4 = torch.nn.Conv1d(64,128,1)
+		#self.conv5 = torch.nn.Conv1d(128,1024,1)
+		self.conv6 = nn.Conv1d(3236, 512, 1) 
 		self.conv7 = nn.Conv1d(512, 256, 1)
 		self.conv8 = nn.Conv1d(256, 128, 1)
 		self.conv9 = nn.Conv1d(128, 3, 1)
-		self.bn1 = nn.BatchNorm1d(64)
-		self.bn2 = nn.BatchNorm1d(64)
-		self.bn3 = nn.BatchNorm1d(64)
-		self.bn4 = nn.BatchNorm1d(128)
-		self.bn5 = nn.BatchNorm1d(1024)
+		#self.bn1 = nn.BatchNorm1d(64)
+		#self.bn2 = nn.BatchNorm1d(64)
+		#self.bn3 = nn.BatchNorm1d(64)
+		#self.bn4 = nn.BatchNorm1d(128)
+		#self.bn5 = nn.BatchNorm1d(1024)
 		self.bn6 = nn.BatchNorm1d(512)
 		self.bn7 = nn.BatchNorm1d(256)
 		self.bn8 = nn.BatchNorm1d(128)
@@ -105,13 +105,15 @@ class MLP_rot_inv_for(nn.Module):
 		x = x.permute(0, 2, 1)
 		x = x.unsqueeze(1)
 		out = self.conv1(x)
-		#out = self.conv2(out)
-		#point_features = out
-		#out = self.conv3(out)
-		#out = self.conv4(out)
-		#out = self.conv5(out)
-		#global_features = self.max_pool(out)
-		#global_features_repeated = global_features.unsqueeze(-1).repeat(1,1,1, self.num_pts)
+		out = self.conv2(out)
+		point_features = out
+		out = self.conv3(out)
+		out = self.conv4(out)
+		out = self.conv5(out)
+		global_features = self.max_pool(out.reshape(out.shape[0], -1, out.shape[-1]))
+		#global_features_repeated = global_features.view(global_features.shape[0], -1)
+		global_features_repeated = global_features.repeat(1,1, self.num_pts)
+		point_features = point_features.reshape(point_features.shape[0], -1, point_features.shape[-1])
 
 		#out = F.relu(self.bn6(self.conv6(torch.cat([point_features, global_features_repeated],1))))
 		
@@ -121,32 +123,14 @@ class MLP_rot_inv_for(nn.Module):
 		# out = F.relu(self.bn6(self.conv6(torch.cat([point_features, global_features_repeated, avgpool],1))))
 
 		#3DMMImg
-		# avgpool = other_input1
-		# avgpool = avgpool.unsqueeze(2).unsqueeze(2).repeat(1,1,3,self.num_pts)
-		
-		# shape_code = other_input2
-		# shape_code = shape_code.unsqueeze(-1).repeat(1,1,3,self.num_pts)
-
-		# expr_code = other_input3
-		# expr_code = expr_code.unsqueeze(-1).repeat(1,1,3,self.num_pts)
-
-		# out = self.conv6(torch.cat([point_features, global_features_repeated, avgpool, shape_code, expr_code],1))
-
-
-		# out = self.conv7(out)
-		# out = self.conv8(out)
-		# out = self.conv9(out)
-		# out = out.squeeze(1)
-
-		#3DMMImg
-
-		out = F.relu(self.bn2(self.conv2(out)))
-		point_features = out
-		out = F.relu(self.bn3(self.conv3(out)))
-		out = F.relu(self.bn4(self.conv4(out)))
-		out = F.relu(self.bn5(self.conv5(out)))
-		global_features = self.max_pool(out)
-		global_features_repeated = global_features.repeat(1,1, self.num_pts)
+		#out = out.reshape(out.shape[0],-1,out.shape[-1])
+		#out = F.relu(self.bn2(self.conv2(out)))
+		#point_features = out
+		#out = F.relu(self.bn3(self.conv3(out)))
+		#out = F.relu(self.bn4(self.conv4(out)))
+		#out = F.relu(self.bn5(self.conv5(out)))
+		#global_features = self.max_pool(out)
+		#global_features_repeated = global_features.repeat(1,1, self.num_pts)
 		#out = F.relu(self.bn6(self.conv6(torch.cat([point_features, global_features_repeated],1))))
 		
 		# Avg_pool
@@ -298,11 +282,11 @@ class VNBatchNorm(nn.Module):
         x: point features of shape [B, N_feat, 3, N_samples, ...]
         '''
         # norm = torch.sqrt((x*x).sum(2))
-        norm = torch.norm(x, dim=2) + EPS
-        norm_bn = self.bn(norm)
-        norm = norm.unsqueeze(2)
-        norm_bn = norm_bn.unsqueeze(2)
-        x = x / norm * norm_bn
+        #norm = torch.norm(x, dim=2) + EPS
+        #norm_bn = self.bn(norm)
+        #norm = norm.unsqueeze(2)
+        #norm_bn = norm_bn.unsqueeze(2)
+        #x = x / norm * norm_bn
         
         return x
 
