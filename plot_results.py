@@ -9,6 +9,7 @@ from torchvision.transforms import ToPILImage
 from torch.utils.data import DataLoader
 from math import cos, sin, sqrt
 import cv2
+import matplotlib.pyplot as plt
 
 from utils.plot import plotUtils
 from model_building import SynergyNet
@@ -16,6 +17,46 @@ from data.dataloader_300wlp import dataset_from_datatool
 
 to_np = lambda tensor: tensor.detach().cpu().numpy()
 to_nps = lambda tensors: [to_np(t) for t in tensors]
+
+def draw_landmarks(img, pts, color, saving_path):
+    height, width = img.shape[:2]
+    base = 6.4 
+    plt.figure(figsize=(base, height / width * base))
+    plt.imshow(img[:, :, ::-1])
+    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+    plt.axis('off')
+
+    markeredgecolor = color
+
+    if not type(pts) in [tuple, list]:
+        pts = [pts]
+    for i in range(len(pts)):
+        alpha = 0.8
+        markersize = 3.5
+        lw = 1.5
+
+        # close eyes and mouths
+        nums = [0, 17, 22, 27, 31, 36, 42, 48, 60, 68]
+        plot_close = lambda i1, i2: plt.plot([pts[i][0, i1], pts[i][0, i2]], [pts[i][1, i1], pts[i][1, i2]],
+                                                color=color, lw=lw, alpha=alpha - 0.1)
+        plot_close(41, 36)
+        plot_close(47, 42)
+        plot_close(59, 48)
+        plot_close(67, 60)
+
+        for ind in range(len(nums) - 1):
+            l, r = nums[ind], nums[ind + 1]
+            plt.plot(pts[i][0, l:r], pts[i][1, l:r], color=color, lw=lw, alpha=alpha - 0.1)
+
+            plt.plot(pts[i][0, l:r], pts[i][1, l:r], marker='o', linestyle='None', markersize=markersize,
+                        color=color,
+                        markeredgecolor=markeredgecolor, alpha=alpha)
+    plt.tight_layout(pad=0)
+    plt.savefig(saving_path, dpi=200)
+    image = cv2.imread(saving_path)
+    image = cv2.resize(image, dsize=(height, width), interpolation=cv2.INTER_CUBIC)
+    os.remove(saving_path)
+    return image
 
 def _draw_3d_axis(
     img,
@@ -62,7 +103,16 @@ def _draw_3d_axis(
 
     return img
 
-def _plot_lms(plotter, lm_3d, lm_color = (255, 150, 0)):
+def _plot_lms(plotter, lm_3d, lm_color=(255, 150, 0), lm_with_lines=False):
+    if lm_with_lines:
+        lm_color = (lm_color[2]/255, lm_color[1]/255, lm_color[0]/255) # BGR to RGB
+        plotter.image = draw_landmarks(
+                            plotter.image, 
+                            lm_3d, 
+                            lm_color,
+                            "tmp.jpg"
+                            )
+    else:
         lms = []
         num_lm = lm_3d.shape[1]
         for i in range(num_lm):
@@ -94,7 +144,14 @@ def _plot_head_pose(plotter, head_pose, lm_3d, ax_colors=None):
         ax_colors=ax_colors
     )
 
-def plot_results(model, images, saving_path, targets=None, only_gt=False):
+def plot_results(
+    model, 
+    images, 
+    saving_path, 
+    lm_with_lines=False,
+    targets=None, 
+    only_gt=False
+    ):
     if targets is None and only_gt:
         raise ValueError("Can't set only_gt=True without providing GT targets")
 
@@ -108,8 +165,9 @@ def plot_results(model, images, saving_path, targets=None, only_gt=False):
         bbox = targets["bbox"]
 
     # Get models predictions
-    lms_3d, pose_para = model.forward_test(images, bbox)
-    lms_3d, pose_para = to_nps([lms_3d, pose_para])
+    if not only_gt:
+        lms_3d, pose_para = model.forward_test(images, bbox)
+        lms_3d, pose_para = to_nps([lms_3d, pose_para])
 
     # Plots predictions and GT
     if os.path.exists(saving_path):
@@ -128,7 +186,7 @@ def plot_results(model, images, saving_path, targets=None, only_gt=False):
             head_pose = pose_para[i, :3, 0]
 
             lm_color = (255, 150, 0) # BGR
-            _plot_lms(plotter, lm_3d, lm_color)
+            _plot_lms(plotter, lm_3d, lm_color, lm_with_lines=lm_with_lines)
             ax_colors = [(0,0,255), (0,255,0), (255,0,0)] # BGR scale
             _plot_head_pose(plotter, head_pose, lm_3d, ax_colors)
 
@@ -138,7 +196,7 @@ def plot_results(model, images, saving_path, targets=None, only_gt=False):
             head_pose_gt = pose_para_gt[i, :3]
 
             lm_color = (0, 150, 255) # BGR
-            _plot_lms(plotter, lm_3d_gt, lm_color)
+            _plot_lms(plotter, lm_3d_gt, lm_color, lm_with_lines=lm_with_lines)
             ax_colors = [(0,0,90), (0,90,0), (90,0,0)] # BGR scale
             _plot_head_pose(plotter, head_pose_gt, lm_3d_gt, ax_colors)
 
@@ -151,8 +209,9 @@ if __name__ == '__main__':
     # Config General
     args = namedtuple("args", ["use_cuda", "arch", "img_size", "num_lms", "crop_images"])
     only_gt = False
-    args.use_cuda = True
+    args.use_cuda = False
     args.crop_images = False
+    lm_with_lines = False
 
     # Config Model
     args.arch = "mobilenet_v2"
@@ -170,20 +229,25 @@ if __name__ == '__main__':
     batch_size = 16
     workers = 4
 
-    # Build objects and plot
-    print(f">>> Loading model from '{ckp_path}' ...")
-    device = torch.device(f"cuda" if (args.use_cuda and torch.cuda.is_available()) else "cpu")
-    args.device = device
-    model = SynergyNet(args)
-    checkpoint = torch.load(ckp_path, map_location=lambda storage, loc: storage)['state_dict']
-    model.load_state_dict(checkpoint, strict=False)
+    # Build objects
+    if only_gt:
+        model = None
+        pin_memory = False
+    else:
+        print(f">>> Loading model from '{ckp_path}' ...")
+        device = torch.device(f"cuda" if (args.use_cuda and torch.cuda.is_available()) else "cpu")
+        args.device = device
+        pin_memory = (args.device.type == "gpu")
+        model = SynergyNet(args)
+        checkpoint = torch.load(ckp_path, map_location=lambda storage, loc: storage)['state_dict']
+        model.load_state_dict(checkpoint, strict=False)
 
     print(f">>> Loading data tool from '{datatool_root_dir}' ...")
     dataset = dataset_from_datatool(datatool_root_dir, tags, add_transforms)
-    pin_memory = (args.device.type == "gpu")
     data_loader = DataLoader(dataset, batch_size=batch_size, num_workers=workers,
                               shuffle=True, pin_memory=pin_memory, drop_last=False)
 
+    # Plot images
     images, targets = next(iter(data_loader))
     saving_path = f"ckpts/{ckp_name}/images_results_test"
     print(f">>> Plotting images ...")
@@ -191,6 +255,7 @@ if __name__ == '__main__':
         model,
         images,
         saving_path,
+        lm_with_lines=lm_with_lines,
         targets=targets,
         only_gt=only_gt
         )

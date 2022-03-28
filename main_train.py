@@ -44,7 +44,6 @@ def parse_args():
     parser.add_argument('--weight-decay', '--wd', default=5e-4, type=float)
     parser.add_argument('--print-freq', '-p', default=20, type=int)
     parser.add_argument('--resume', default='', type=str, metavar='PATH')
-    parser.add_argument('--resume_pose', default='', type=str, metavar='PATH')
     parser.add_argument('--use-cuda', default='true', type=str2bool)
     parser.add_argument('--root', default='')
     parser.add_argument('--ckp-dir', default='ckpts', type=str)
@@ -177,7 +176,14 @@ def train(
             idx = np.random.choice(n_input, n_samples, replace=False)
             input_ = input[idx]
             target_ = {k:v[idx] for k,v in target.items()}
-            plot_results(model, input_, imgs_saving_path, targets=target_, only_gt=False)
+            plot_results(
+                model, 
+                input_, 
+                imgs_saving_path, 
+                lm_with_lines=True,
+                targets=target_, 
+                only_gt=False
+                )
 
 def validate(
     val_loader,
@@ -216,7 +222,14 @@ def validate(
         idx = np.random.choice(n_input, n_samples, replace=False)
         input_ = input[idx]
         target_ = {k:v[idx] for k,v in target.items()}
-        plot_results(model, input_, imgs_saving_path, targets=target_, only_gt=False)
+        plot_results(
+            model, 
+            input_, 
+            imgs_saving_path, 
+            lm_with_lines=True,
+            targets=target_, 
+            only_gt=False
+            )
 
     msg = (
         'Validation losses:\t' + \
