@@ -189,13 +189,18 @@ class SynergyNet(nn.Module):
 		if self.crop_images and (bbox is not None):
 			bbox = bbox.type(torch.int)
 			batch_size = input.shape[0]
-
+			valid_samples = []
+			
 			for i in range(batch_size):
 				input_i = input[i,:, bbox[i,1] : bbox[i,1] + bbox[i,3], bbox[i,0] : bbox[i,0] + bbox[i,2]]
-				resize = transforms.Resize((self.img_size, self.img_size))
-				input[i] = resize(input_i)
 
-		return input.to(self.device, non_blocking=True)
+				if input_i.shape[1] > 0  and input_i.shape[2] > 0:
+					valid_samples.append(i)
+					resize = transforms.Resize((self.img_size, self.img_size))
+					input[i] = resize(input_i)
+
+
+		return input[valid_samples].to(self.device, non_blocking=True)
 
 	def process_target(self, target):
 		for key in target.keys():
