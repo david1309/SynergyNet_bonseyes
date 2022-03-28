@@ -97,16 +97,19 @@ def _plot_head_pose(plotter, head_pose, lm_3d, ax_colors=None):
 def plot_results(model, images, saving_path, targets=None, only_gt=False):
     if targets is None and only_gt:
         raise ValueError("Can't set only_gt=True without providing GT targets")
-    # Get models predictions
-    lms_3d, pose_para, shape_para, exp_para = model.forward_test(images)
-    lms_3d, pose_para, shape_para, exp_para = to_nps([lms_3d, pose_para, shape_para, exp_para])
 
     # Get GT's
     plot_gt = False
+    bbox = None
     if targets is not None:
         plot_gt = True
         lms_3d_gt = to_np(targets["lm3d"])
         pose_para_gt = to_np(targets["pose_params"])
+        bbox = targets["bbox"]
+
+    # Get models predictions
+    lms_3d, pose_para = model.forward_test(images, bbox)
+    lms_3d, pose_para = to_nps([lms_3d, pose_para])
 
     # Plots predictions and GT
     if os.path.exists(saving_path):
@@ -145,10 +148,11 @@ def plot_results(model, images, saving_path, targets=None, only_gt=False):
 
 
 if __name__ == '__main__':
-    # Config Other
-    args = namedtuple("args", ["use_cuda", "arch", "img_size", "num_lms"])
-    only_gt = True
+    # Config General
+    args = namedtuple("args", ["use_cuda", "arch", "img_size", "num_lms", "crop_images"])
+    only_gt = False
     args.use_cuda = True
+    args.crop_images = False
 
     # Config Model
     args.arch = "mobilenet_v2"
@@ -178,7 +182,7 @@ if __name__ == '__main__':
     dataset = dataset_from_datatool(datatool_root_dir, tags, add_transforms)
     pin_memory = (args.device.type == "gpu")
     data_loader = DataLoader(dataset, batch_size=batch_size, num_workers=workers,
-                              shuffle=True, pin_memory=True, drop_last=False)
+                              shuffle=True, pin_memory=pin_memory, drop_last=False)
 
     images, targets = next(iter(data_loader))
     saving_path = f"ckpts/{ckp_name}/images_results_test"

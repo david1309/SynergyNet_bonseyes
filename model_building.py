@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from torchvision import transforms as T
+from torchvision import transforms
 import scipy.io as sio
 
 # All data parameters import
@@ -79,6 +79,7 @@ class SynergyNet(nn.Module):
 		# General config
 		self.img_size = args.img_size
 		self.device = args.device
+		self.crop_images = args.crop_images
 
 		# Morphable model parameters
 		bfm_path = 'bfm_utils/morphable_models/BFM.mat'
@@ -161,12 +162,6 @@ class SynergyNet(nn.Module):
 
 		return landmarks3d
 
-	def parse_target_to_device(self, target):
-		for key in target.keys():
-			target[key].requires_grad = False
-			target[key] = target[key].float().to(self.device, non_blocking=True)
-		return target
-
 	@staticmethod
 	def parse_target_params(target):
 		pose = target["pose_params"]
@@ -188,12 +183,33 @@ class SynergyNet(nn.Module):
 
 		return pose_para, shape_para, exp_para
 
+	def process_input(self, input, bbox=None):
+		input = input.clone()
+
+		if self.crop_images and (bbox is not None):
+			bbox = bbox.type(torch.int)
+			batch_size = input.shape[0]
+
+			for i in range(batch_size):
+				input_i = input[i,:, bbox[i,1] : bbox[i,1] + bbox[i,3], bbox[i,0] : bbox[i,0] + bbox[i,2]]
+				resize = transforms.Resize((self.img_size, self.img_size))
+				input[i] = resize(input_i)
+
+		return input.to(self.device, non_blocking=True)
+
+	def process_target(self, target):
+		for key in target.keys():
+			target[key].requires_grad = False
+			target[key] = target[key].float().to(self.device, non_blocking=True)
+		return target
+
 	def forward(self, input, target):
 		# General config
+		target = self.process_target(target)
+		input = self.process_input(input, bbox=target["bbox"])
+
 		param_loss_factor = 100 * 1
 		param_diff_loss_factor = 100 * 1
-		input = input.to(self.device, non_blocking=True)
-		target = self.parse_target_to_device(target)
 
 		# Image to 3DMM Parameters
 		_3D_attr, avgpool = self.I2P(input)
@@ -218,10 +234,10 @@ class SynergyNet(nn.Module):
 
 		return self.loss
 
-	def forward_test(self, input):
+	def forward_test(self, input, bbox=None):
 		"""test time forward"""
 		# General config
-		input = input.to(self.device, non_blocking=True)
+		input = self.process_input(input, bbox=bbox)
 
 		with torch.no_grad():
 			# Image to 3DMM Parameters
@@ -233,7 +249,7 @@ class SynergyNet(nn.Module):
 			point_residual = self.forwardDirection(vertex_lmk, avgpool, shape_para, exp_para)
 			vertex_lmk = vertex_lmk + point_residual  # Refined landmarks: Lr = Lc + L_residual
 
-		return vertex_lmk, pose_para, shape_para, exp_para
+		return vertex_lmk, pose_para
 
 	def get_losses(self):
 		return self.loss.keys()

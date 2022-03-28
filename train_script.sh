@@ -4,11 +4,13 @@
 
 python3 main_train.py \
     --datatool-root-dir="/hdd1/datasets/300W_LP/output_debug_all/" \
-    --train-tags="LFPW,LFPW_Flip,HELEN,HELEN_Flip" \
-    --val-tags="IBUG,AFW" \
+    --train-tags="HELEN" \
+    --val-tags="IBUG" \
+    \
     --debug=False \
     --exp-name="loss_weights_100" \
     --use-cuda=True \
+    --crop-images=False \
     \
     --epochs=10 \
     --batch-size=16 \

@@ -53,11 +53,11 @@ def plot_sample(img, face_lm_2d, bbox, saving_path=None):
 
 class PTDataset300WLP(Dataset):
     def __init__(
-        self, 
-        data_root_dir: str, 
+        self,
+        data_root_dir: str,
         tags: list,
         add_transforms: list = [],
-        operating_mode: str = 'memory', 
+        operating_mode: str = 'memory',
         **kwargs
         ):
         """
@@ -66,7 +66,7 @@ class PTDataset300WLP(Dataset):
         :param data_root_dir: Root Directory containing all the tags produced
         by the datatool
 
-        :param tags: Name of each subfolder (tag), each one containing the 
+        :param tags: Name of each subfolder (tag), each one containing the
         "sample_files" directory and "dataset.json" file
 
         :param operating_mode: Operating mode for the datatool api to handle
@@ -121,7 +121,7 @@ class PTDataset300WLP(Dataset):
                 transforms.Resize(self.kwargs['model_input_size']),
                 transforms.ToTensor()
             ]
-        all_transforms = [*base_transforms, *add_transforms] 
+        all_transforms = [*base_transforms, *add_transforms]
         self.transform = transforms.Compose(all_transforms)
 
     def __len__(self):
@@ -132,9 +132,17 @@ class PTDataset300WLP(Dataset):
         annotation = self.annotations.get(annot_id)
         model_input_size = self.kwargs['model_input_size']
 
-        # Landmarks 
+        # Landmarks
         lm3d = annotation.face_landmarks_3d
         bb2d = annotation.face_bounding_box_2d
+
+        # Bounding Bounding box
+        bbox = torch.Tensor([
+            bb2d.topX,
+            bb2d.topY,
+            bb2d.w,
+            bb2d.h
+        ])
 
         # Morphable parameters (normalized by 1e7, 10, image height, and 100)
         shape_params = torch.Tensor(annotation.shape_params) / 1e7
@@ -143,12 +151,12 @@ class PTDataset300WLP(Dataset):
         # BFM documentation states that:
         # angles: [3,]. x, y, z angles
         # x: pitch.
-        # y: yaw. 
-        # z: roll. 
+        # y: yaw.
+        # z: roll.
         head_pose_ = annotation.head_pose
         deg2rad = (np.pi / 180)
         head_pose = [
-            head_pose_.pitch * deg2rad, 
+            head_pose_.pitch * deg2rad,
             head_pose_.yaw * deg2rad,
             head_pose_.roll * deg2rad,
         ]
@@ -168,14 +176,15 @@ class PTDataset300WLP(Dataset):
         # Read image for the sample and Apply transforms
         image_name = annotation.id_image + '.jpg'
         tag = annotation.tag
-        img = Image.open(os.path.join(self.data_root_dir, tag, 'sample_files', image_name))  
+        img = Image.open(os.path.join(self.data_root_dir, tag, 'sample_files', image_name))
         img = self.transform(img)
 
         target = {
             "lm3d" : lm3d,
             "pose_params" : pose_params,
             "shape_params" : shape_params,
-            "exp_params" : exp_params
+            "exp_params" : exp_params,
+            "bbox" : bbox
         }
         return img, target
 
@@ -183,25 +192,25 @@ class PTDataset300WLP(Dataset):
 def dataset_from_datatool(datatool_root_dir, tags, add_transforms=[]):
     params = {
         'model_input_size': (450, 450),  # Width x Height of input tensor for the model
-        'min_landmark_count': 68,  # Min number of landmarks 
+        'min_landmark_count': 68,  # Min number of landmarks
         'shape_param_size': 199,
         'expression_param_size': 29
     }
     dataset = PTDataset300WLP(
         data_root_dir=datatool_root_dir,
-        tags=tags, 
-        operating_mode='memory', 
+        tags=tags,
+        operating_mode='memory',
         add_transforms=add_transforms,
         **params
         )
-    
+
     return dataset
 
 # def main():
 #     # Input arguments
 #     params = {
 #         'model_input_size': (450, 450),  # Width x Height of input tensor for the model
-#         'min_landmark_count': 68,  # Min number of landmarks 
+#         'min_landmark_count': 68,  # Min number of landmarks
 #         'shape_param_size': 199,
 #         'expression_param_size': 29
 #     }
@@ -211,7 +220,7 @@ def dataset_from_datatool(datatool_root_dir, tags, add_transforms=[]):
 
 #     # Create dataset instance
 #     normalize = Normalize(
-#         mean=[0.498, 0.498, 0.498], 
+#         mean=[0.498, 0.498, 0.498],
 #         std=[0.229, 0.229, 0.229]
 #         )
 #     add_transforms = [normalize]
@@ -219,38 +228,12 @@ def dataset_from_datatool(datatool_root_dir, tags, add_transforms=[]):
 
 #     # Build and test Data Loader
 #     dataset = PTDataset300WLP(
-#         data_root_dir=data_root_dir, 
-#         tags=tags, 
-#         operating_mode='memory', 
+#         data_root_dir=data_root_dir,
+#         tags=tags,
+#         operating_mode='memory',
 #         add_transforms=add_transforms,
 #         **params
 #         )
 
 #     for i in range(len(dataset)):
 #         img, target = dataset.__getitem__(i)
-
-
-# if __name__ == main():
-#     main()
-
-# !OLD plotting code
-# bbox = [
-#     bb2d.topX, 
-#     bb2d.topY,
-#     bb2d.w,
-#     bb2d.h
-# ]
-
-# base_path = "example_dataloaders/sample_imgs"
-# Path(base_path).mkdir(parents=True, exist_ok=True)
-# saving_path =  annotation.id_image + "_ori" + '.jpg'
-# plot_sample(img, lm3d, bbox, saving_path=os.path.join(base_path, saving_path))
-# img_ = np.array(img)     
-# print((img_.max(), img_.min(), img_.mean(), img_.std()))
-
-# img = img.crop((
-#     bb2d.topX, 
-#     bb2d.topY,
-#     bb2d.topX + bb2d.w,
-#     bb2d.topY + bb2d.h
-#     ))     
