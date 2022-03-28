@@ -220,7 +220,7 @@ def plot_results(
 
 if __name__ == '__main__':
     # Config General
-    args = namedtuple("args", ["use_cuda", "arch", "img_size", "num_lms", "crop_images", "use_rot_inv"])
+    args = namedtuple("args", ["use_cuda", "arch", "img_size", "num_lms", "crop_images", "use_rot_inv", "bfm_path"])
     only_gt = False
     args.use_rot_inv = False
     args.use_cuda = False
@@ -235,9 +235,10 @@ if __name__ == '__main__':
     args.arch = "mobilenet_v2"
     args.img_size = 450
     args.num_lms = 77
+    args.bfm_path = "bfm_utils/morphable_models/BFM.mat"
 
-    ckp_epoch = 20
-    ckp_name = "loss_weight_100_not_HELEN_28.03.2022_12h17m30s"
+    ckp_epoch = 38
+    ckp_name = "loss_weight_100_all_28.03.2022_14h23m36s"
     ckp_path = f"ckpts/{ckp_name}/model_ckpts/SynergyNet_ckp_epoch_{ckp_epoch}.pth.tar"
 
     # Config Data Loader
@@ -268,7 +269,6 @@ if __name__ == '__main__':
     # Plot images
     images, targets = next(iter(data_loader))
     saving_path = f"ckpts/{ckp_name}/images_results_test"
-    saving_path = None
     print(f">>> Plotting images ...")
     plot_results(
         model,
