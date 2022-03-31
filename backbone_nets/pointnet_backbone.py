@@ -264,11 +264,11 @@ class VNLinearLeakyReLU(nn.Module):
         x: point features of shape [B, N_feat, 3, N_samples, ...]
         '''
         # Linear
-        p = self.map_to_feat(x.transpose(1,-1)).transpose(1,-1)
+        p = self.map_to_feat(x.transpose(1,-1).view(-1,x.shape[1])).view(x.shape[0],x.shape[-1],x.shape[-2],-1).transpose(1,-1)
         # BatchNorm
         p = self.batchnorm(p)
         # LeakyReLU
-        d = self.map_to_dir(x.transpose(1,-1)).transpose(1,-1)
+        d = self.map_to_dir(x.transpose(1,-1).view(-1,x.shape[1])).view(x.shape[0],x.shape[-1],x.shape[-2],-1).transpose(1,-1)
         dotprod = (p*d).sum(2, keepdims=True)
         mask = (dotprod >= 0).float()
         d_norm_sq = (d*d).sum(2, keepdims=True)
