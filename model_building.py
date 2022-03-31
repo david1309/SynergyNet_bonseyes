@@ -95,7 +95,7 @@ class SynergyNet(nn.Module):
 		if args.use_rot_inv:
 			self.forwardDirection = MLP_rot_inv_for(args.num_lms)
 		else:
-			self.forwardDirection = MLP_for(args.num_lms)
+			self.forwardDirection = MLP_for(args.num_lms, args.arch)
 
 		# Reverse
 		# Forward

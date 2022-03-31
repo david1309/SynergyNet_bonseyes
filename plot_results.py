@@ -223,23 +223,36 @@ if __name__ == '__main__':
     args = namedtuple("args", ["use_cuda", "arch", "img_size", "num_lms", "crop_images", "use_rot_inv", "bfm_path"])
     only_gt = False
     args.use_rot_inv = False
-    args.use_cuda = False
+    args.use_cuda = True
     args.crop_images = False
     lm_with_lines = True
 
-    seed = 13
+    seed = 131313
     np.random.seed(seed)
     torch.manual_seed(seed)
 
     # Config Model
-    args.arch = "mobilenet_v2"
+
+    ckp_epoch = 100
+    ckp_name = "rot_inv_all_data_29.03.2022_05h46m12s"
+    args.arch = "mobilenet_v2"  # "mobilenet_v2", resnet50"
+    args.use_rot_inv = True
+
+    # ckp_epoch = 48
+    # ckp_name = "loss_weight_100_all_28.03.2022_14h23m36s"
+    # args.arch = "mobilenet_v2"  # "mobilenet_v2", resnet50"
+    # args.use_rot_inv = False
+
+    # ckp_epoch = 16
+    # ckp_name = "backbone_resnet50_28.03.2022_23h53m10s"
+    # args.arch = "resnet50"  # "mobilenet_v2", resnet50"
+    # args.use_rot_inv = False
+
+    ckp_path = f"ckpts/{ckp_name}/model_ckpts/SynergyNet_ckp_epoch_{ckp_epoch}.pth.tar"
+    
     args.img_size = 450
     args.num_lms = 77
     args.bfm_path = "bfm_utils/morphable_models/BFM.mat"
-
-    ckp_epoch = 38
-    ckp_name = "loss_weight_100_all_28.03.2022_14h23m36s"
-    ckp_path = f"ckpts/{ckp_name}/model_ckpts/SynergyNet_ckp_epoch_{ckp_epoch}.pth.tar"
 
     # Config Data Loader
     datatool_root_dir = "/root/300wlp/"
@@ -268,7 +281,7 @@ if __name__ == '__main__':
 
     # Plot images
     images, targets = next(iter(data_loader))
-    saving_path = f"ckpts/{ckp_name}/images_results_test"
+    saving_path = f"ckpts/{ckp_name}/images_results_test_epoch_{ckp_epoch}"
     print(f">>> Plotting images ...")
     plot_results(
         model,

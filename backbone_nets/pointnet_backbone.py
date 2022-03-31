@@ -6,14 +6,21 @@ __all__ = ['MLP_for', 'MLP_rot_inv_for','MLP_rev','MLP_rot_inv_rev']
 EPS = 1e-6
 
 class MLP_for(nn.Module):
-	def __init__(self, num_pts):
+	def __init__(self, num_pts, avg_pool_type):
 		super(MLP_for,self).__init__()
 		self.conv1 = torch.nn.Conv1d(3,64,1)
 		self.conv2 = torch.nn.Conv1d(64,64,1)
 		self.conv3 = torch.nn.Conv1d(64,64,1)
 		self.conv4 = torch.nn.Conv1d(64,128,1)
 		self.conv5 = torch.nn.Conv1d(128,1024,1)
-		self.conv6 = nn.Conv1d(3364, 512, 1) 
+
+		if avg_pool_type == "mobilenet_v2":
+			self.conv6 = nn.Conv1d(2596, 512, 1)
+		elif avg_pool_type == "resnet50":
+			self.conv6 = nn.Conv1d(3364, 512, 1)
+		else:
+			raise ValueError(f"MLP_for for avg pool type '{avg_pool_type}' is not supported")
+
 		self.conv7 = nn.Conv1d(512, 256, 1)
 		self.conv8 = nn.Conv1d(256, 128, 1)
 		self.conv9 = nn.Conv1d(128, 3, 1)

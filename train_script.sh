@@ -9,18 +9,19 @@ python3 main_train.py \
     --val-tags="IBUG,AFW" \
     \
     --debug=False \
-    --exp-name="loss_weight_100_all" \
+    --exp-name="rot_inv_all_data" \
     --use-cuda=True \
     --crop-images=False \
     \
     --epochs=100 \
     --batch-size=128 \
     --base-lr=0.0001\
-    --milestones=80,90 \
+    --milestones=30,50,70,90 \
     --save-val-freq=2 \
     --num-lms=77 \
     \
     --arch="mobilenet_v2" \
+    --use-rot-inv=True \
     \
     --start-epoch=1 \
     --warmup=-1 \

@@ -62,7 +62,7 @@ def parse_args():
     parser.add_argument('--crop-images', default="false", type=str2bool)
     parser.add_argument('--use-rot-inv', default="false", type=str2bool)
     parser.add_argument('--bfm-path', default="bfm_utils/morphable_models/BFM.mat", type=str)
-    parser.add_argument('--use-300wlp', default="false", type=str2bool)
+    parser.add_argument('--use-300wlp', default="true", type=str2bool)
     
     args = parser.parse_args()
 
