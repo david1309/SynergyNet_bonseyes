@@ -2,8 +2,7 @@
 3DV 2021: Synergy between 3DMM and 3D Landmarks for Accurate 3D Facial Geometry
 Cho-Ying Wu, Qiangeng Xu, Ulrich Neumann, CGIT Lab at University of Souther California
 
-Forked from original [SynergyNet repo](https://github.com/choyingw/SynergyNet). 
-[<a href="https://arxiv.org/abs/2110.09772">paper</a>] [<a href="https://youtu.be/i1Y8U2Z20ko">video</a>] [<a href="https://choyingw.github.io/works/SynergyNet/index.html">project page</a>]
+Forked from original [SynergyNet repo](https://github.com/choyingw/SynergyNet) [<a href="https://arxiv.org/abs/2110.09772">paper</a>] [<a href="https://youtu.be/i1Y8U2Z20ko">video</a>] [<a href="https://choyingw.github.io/works/SynergyNet/index.html">project page</a>]
 
 This version is adapted to work for morphable model parameters using the [Basel Face Model](https://faces.dmi.unibas.ch/bfm/) (BFM) and [FLAME model](https://flame.is.tue.mpg.de/). There is one branch for BFM and a separate one for FLAME.
 
@@ -30,12 +29,11 @@ git submodule init
 git submodule update
 ```
 
-Run the following commands to install requirements (here we assume yout GPU runs in CUDA version 11.3. If its different go tot he Pytorch website and select another version):
+Run the following commands to install requirements (the installation assumes your GPU runs in CUDA version 11.3. If your CUDA version is different, go to the Pytorch website and select another version):
 ```
 pip3 install torch torchvision --extra-index-url https://download.pytorch.org/whl/cu113
 
 pip install -e .
-
 ```
 
 After this, place the BFM model *.mat* file inside `bfm_utils/morphable_models/` folder. Download the file from [here](https://drive.google.com/file/d/1V5UAwL8AB_dZoxn4HIUzBDEs4MVRZkPR/view?usp=sharing).
@@ -50,9 +48,9 @@ For a quick debug to validate changes in the code, run: `bash train_script_debug
 Important arguments / hyperparemters of the training script are:
 
 * `--datatool-root-dir`: the path to the output folder of the Datatool.
-* `--train-tags` / `--val-tags`: names (strings) of the datatool tags (subfolder or subdatasets) you want to use fro training and validation .
-* `--exp-name`: Name of the experiment, used for saving all related checkpoints (saved models, logs, results images, tensorboard files etc.).
-* `--debug`: if `True`, quickly runs the training only using few samples of the datatool (few == batch-size). 
+* `--train-tags` / `--val-tags`: names of the datatool tags (subfolder or subdatasets) you want to use for training and validation .
+* `--exp-name`: Name of the experiment, used for saving all related checkpoints (saved models, logs, results images, tensorboard files etc.). Checkpoints are saved under `ckpts/<exp-name>`.
+* `--debug`: if *True*, quickly runs the training only using few samples of the datatool (few == batch-size). 
 * `--epochs, --batch-size, --base-lr`: variables controling training details.
 
 You can also train the model using the command line and passing the desired arguments:
