@@ -11,3 +11,4 @@ runs/*
 __pycache__
 venv
 *.tar
+*.egg-info/

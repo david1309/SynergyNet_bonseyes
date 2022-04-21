@@ -5,18 +5,18 @@
 
 python3 main_train.py \
     --datatool-root-dir="/root/output_debug_all_wv" \
-    --train-tags="LFPW,LFPW_Flip,HELEN,HELEN_Flip" \
-    --val-tags="IBUG,AFW" \
+    --train-tags="IBUG" \
+    --val-tags="IBUG_Flip" \
     \
-    --debug=False \
-    --exp-name="rot_inv_all_data" \
+    --debug=True \
+    --exp-name="debug" \
     --use-cuda=True \
     --crop-images=False \
     \
-    --epochs=100 \
-    --batch-size=128 \
+    --epochs=10 \
+    --batch-size=32 \
     --base-lr=0.0001\
-    --milestones=30,50,70,90 \
+    --milestones=5,8,9 \
     --save-val-freq=2 \
     --num-lms=77 \
     \

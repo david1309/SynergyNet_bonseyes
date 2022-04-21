@@ -40,7 +40,7 @@ def parse_args():
     parser.add_argument('--epochs', default=40, type=int)
     parser.add_argument('--start-epoch', default=1, type=int)
     parser.add_argument('-b', '--batch-size', default=128, type=int)
-    parser.add_argument('--base-lr', '--learning-rate', default=0.001, type=float)
+    parser.add_argument('--base-lr', '--learning-rate', default=0.0001, type=float)
     parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                         help='momentum')
     parser.add_argument('--weight-decay', '--wd', default=5e-4, type=float)
@@ -60,15 +60,13 @@ def parse_args():
     parser.add_argument('--num-lms', default=77, type=int)
     parser.add_argument('--exp-name', default="experiment", type=str)
     parser.add_argument('--crop-images', default="false", type=str2bool)
-    parser.add_argument('--use-rot-inv', default="false", type=str2bool)
+    parser.add_argument('--use-rot-inv', default="true", type=str2bool)
     parser.add_argument('--bfm-path', default="bfm_utils/morphable_models/BFM.mat", type=str)
     parser.add_argument('--use-300wlp', default="true", type=str2bool)
     
     args = parser.parse_args()
 
     return args
-
-
 
 
 def print_args(args):
@@ -345,6 +343,7 @@ def main(args):
 
 if __name__ == '__main__':
     args = parse_args()  # parse global argsl
+
     # some other operations
     args.train_tags = [str(t) for t in args.train_tags.split(',')]
     args.val_tags = [str(t) for t in args.val_tags.split(',')]

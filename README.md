@@ -1,149 +1,66 @@
-#  <div align="center"> SynergyNet</div>
+#  <div align="center"> SynergyNet - for Basel Face Model (BFM) and FLAME</div>
 3DV 2021: Synergy between 3DMM and 3D Landmarks for Accurate 3D Facial Geometry
-
 Cho-Ying Wu, Qiangeng Xu, Ulrich Neumann, CGIT Lab at University of Souther California
 
-[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/synergy-between-3dmm-and-3d-landmarks-for/face-alignment-on-aflw)](https://paperswithcode.com/sota/face-alignment-on-aflw?p=synergy-between-3dmm-and-3d-landmarks-for)
-[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/synergy-between-3dmm-and-3d-landmarks-for/head-pose-estimation-on-aflw2000)](https://paperswithcode.com/sota/head-pose-estimation-on-aflw2000?p=synergy-between-3dmm-and-3d-landmarks-for)
-[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/synergy-between-3dmm-and-3d-landmarks-for/face-alignment-on-aflw2000-3d)](https://paperswithcode.com/sota/face-alignment-on-aflw2000-3d?p=synergy-between-3dmm-and-3d-landmarks-for)
-
+Forked from original [SynergyNet repo](https://github.com/choyingw/SynergyNet). 
 [<a href="https://arxiv.org/abs/2110.09772">paper</a>] [<a href="https://youtu.be/i1Y8U2Z20ko">video</a>] [<a href="https://choyingw.github.io/works/SynergyNet/index.html">project page</a>]
 
-This paper supersedes the previous version of M3-LRN.
+This version is adapted to work for morphable model parameters using the [Basel Face Model](https://faces.dmi.unibas.ch/bfm/) (BFM) and [FLAME model](https://flame.is.tue.mpg.de/). There is one branch for BFM and a separate one for FLAME.
 
-<img src='demo/demo.gif'>
+An additional adaptation, is that training relies on using data coming from the output of the Datatool (a Datatool is a tool created by [Bonseyes](https://www.bonseyes.com/) for extracting information from a dataset , [see more info here](https://beta.bonseyes.com//doc/pages/user_guides/datatool_index.html)).
+
+
 
 <img src='demo/teaser.png'>
 
-<img src='demo/multiple.png'>
 
-<img src='demo/single.png'>
+## <div align="center"> Git cloning & Install Requirements</div>
+This repository relies in other submodules. Because of this, when cloning the repository please use the command:
 
-## <div align="center"> Advantages</div>
+`git clone --recurse-submodules https://github.com/david1309/SynergyNet_bonseyes` 
 
-:+1: SOTA on all 3D facial alignment, face orientation estimation, and 3D face modeling.<br><br>
-:+1: Fast inference with 3000fps on a laptop RTX 2080.<br><br>
-:+1: Simple implementation with only widely used operations.<br><br>
+Alternatively use the normal clone command, and then update the submodules:
+```bash
+git clone https://github.com/david1309/SynergyNet_bonseyes
+git submodule init
+git submodule update
 
-(This project is built/tested on Python 3.8 and PyTorch 1.9 on a compatible GPU)
+cd data/datatool_api/
+git submodule init
+git submodule update
+```
 
-## <div align="center"> Single Image Inference Demo</div>
+Run the following commands to install requirements (here we assume yout GPU runs in CUDA version 11.3. If its different go tot he Pytorch website and select another version):
+```
+pip3 install torch torchvision --extra-index-url https://download.pytorch.org/whl/cu113
 
-1. Clone
+pip install -e .
 
-    ```git clone https://github.com/choyingw/SynergyNet```
+```
 
-    ```cd SynergyNet ```
+After this, place the BFM model *.mat* file inside `bfm_utils/morphable_models/` folder. Download the file from [here](https://drive.google.com/file/d/1V5UAwL8AB_dZoxn4HIUzBDEs4MVRZkPR/view?usp=sharing).
 
-2. Use conda
 
-    ```conda create --name SynergyNet```
-
-    ```conda activate SynergyNet```
-
-3. Install pre-requisite common packages
-
-    ```PyTorch 1.9 (should also be compatiable with 1.0+ versions), Torchvision, Opencv, Scipy, Matplotlib, Cython ```
-
-4. Download data [<a href="https://drive.google.com/file/d/1YVBRcXmCeO1t5Bepv67KVr_QKcOur3Yy/view?usp=sharing">here</a>] and
-[<a href="https://drive.google.com/file/d/1SQsMhvAmpD1O8Hm0yEGom0C0rXtA0qs8/view?usp=sharing">here</a>]. Extract these data under the repo root.
-
-These data are processed from [<a href="https://github.com/cleardusk/3DDFA">3DDFA</a>] and [<a href="https://github.com/shamangary/FSA-Net">FSA-Net</a>].
-
-Download pretrained weights [<a href="https://drive.google.com/file/d/1BVHbiLTfX6iTeJcNbh-jgHjWDoemfrzG/view?usp=sharing">here</a>]. Put the model under 'pretrained/'
-
-5. Compile Sim3DR and FaceBoxes:
-
-    ```cd Sim3DR```
-
-    ```./build_sim3dr.sh```
-
-    ```cd ../FaceBoxes```
-
-    ```./build_cpu_nms.sh```
-
-    ```cd ..```
-
-6. Inference
-
-    ```python singleImage.py -f img```
-
-The default inference requires a compatible GPU to run. If you would like to run on a CPU, please comment the .cuda() and load the pretrained weights into cpu.
-
-## <div align="center">Benchmark Evaluation</div>
-
-1. Follow Single Image Inference Demo: Step 1-4
-
-2. Benchmarking
-
-    ```python benchmark.py -w pretrained/best.pth.tar```
-
-Print-out results and visualization fo first-50 examples are stored under 'results/' (see 'demo/' for some pre-generated samples as references) are shown.
-
-Update 12/14/2021: Best head pose estimation [<a href="https://drive.google.com/file/d/13LagnHnPvBjWoQwkR3p7egYC6_MVtmG0/view?usp=sharing">pretrained model</a>] that comforms to the one reported in the paper. Use -w to load different pretrained models.
 
 ## <div align="center">Training</div>
+For easily training the model you can run the provided bash script using the command: `bash train_script.sh`.
 
-1. Follow Single Image Inference Demo: Step 1-4.
+For a quick debug to validate changes in the code, run: `bash train_script_debug.sh`.
 
-2. Download training data from [<a href="https://github.com/cleardusk/3DDFA">3DDFA</a>]: train_aug_120x120.zip and extract the zip file under the root folder (Containing about 680K images).
+Important arguments / hyperparemters of the training script are:
 
-3. 
-    ```bash train_script.sh```
+* `--datatool-root-dir`: the path to the output folder of the Datatool.
+* `--train-tags` / `--val-tags`: names (strings) of the datatool tags (subfolder or subdatasets) you want to use fro training and validation .
+* `--exp-name`: Name of the experiment, used for saving all related checkpoints (saved models, logs, results images, tensorboard files etc.).
+* `--debug`: if `True`, quickly runs the training only using few samples of the datatool (few == batch-size). 
+* `--epochs, --batch-size, --base-lr`: variables controling training details.
 
-4. Please refer to train_script for hyperparameters, such as learning rate, epochs, or GPU device. The default settings take ~19G on a 3090 GPU and about 6 hours for training. If your GPU is less than this size, please decrease the batch size and learning rate proportionally.
+You can also train the model using the command line and passing the desired arguments:
 
-## <div align="center">Textured Artistic Face Meshes</div>
+```bash
+python main_train.py  --datatool-root-dir="/root/output_debug_all_wv" --train-tags="IBUG" --val-tags="IBUG_Flip" --debug=True --exp-name="debug_cmd" --epochs=10 --batch-size=32
+```
 
-1. Follow Single Image Inference Demo: Step 1-5.
-
-2. Download artistic faces data [<a href="https://drive.google.com/file/d/1yYR5aqSCUGnggjhTbwU4vEwHxV1xq9ko/view?usp=sharing">here</a>], which are from [<a href="https://faculty.idc.ac.il/arik/site/foa/artistic-faces-dataset.asp">AF-Dataset</a>]. Download our predicted UV maps [<a href="https://drive.google.com/file/d/1TWJiitXAfZD_AwoJLw58XBPgOdanqgcG/view?usp=sharing">here</a>] by UV-texture GAN. Extract them under the root folder.
-
-3.
-    ```python artistic.py -f art-all --png```(whole folder)
-    
-    ```python artistic.py -f art-all/122.png```(single image)
-    
-
-Note that this artistic face dataset contains many different level/style face abstration. If a testing image is close to real, the result is much better than those of highly abstract samples. 
-
-## <div align="center">Textured Real Face Renderings</div>
-
-1. Follow Single Image Inference Demo: Step 1-5.
-
-2. Download our predicted UV maps and real face images for AFLW2000-3D [<a href="https://drive.google.com/file/d/12QCzkzBCKIEA3DSn6Kx5seeCeoUXKISc/view?usp=sharing">here</a>] by UV-texture GAN. Extract them under the root folder.
-
-3.
-    ```python uv_texture_realFaces.py -f texture_data/real --png``` (whole folder)
-
-    ```python uv_texture_realFaces.py -f texture_data/real/image00002_real_A.png``` (single image) 
-
-The results (3D meshes and renderings) are stored under 'inference_output'
-
-## <div align="center">More Results</div>
-
-We show a comparison with [<a href="https://github.com/YadiraF/DECA">DECA</a>] using the top-3 largest roll angle samples in AFLW2000-3D.
-
-<img src='demo/comparison-deca.png'>
-
-
-Facial alignemnt on AFLW2000-3D (NME of facial landmarks):
-
-<img src='demo/alignment.png'>
-
-Face orientation estimation on AFLW2000-3D (MAE of Euler angles):
-
-<img src='demo/orientation.png'>
-
-Results on artistic faces: 
-
-<img src='demo/AF-1.png'>
-
-<img src='demo/AF-2.png'>
-
-**Related Project**
-
-[<a href="https://github.com/choyingw/Voice2Mesh">Voice2Mesh</a>] (analysis on relation for voice and 3D face)
 
 **Bibtex**
 
@@ -155,6 +72,7 @@ If you find our work useful, please consider to cite our work
       title={Synergy between 3DMM and 3D Landmarks for Accurate 3D Facial Geometry}, 
       year={2021}
       }
+
 
 **Acknowledgement**
 
