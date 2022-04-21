@@ -10,8 +10,14 @@ reqs = [
 
     "python-dateutil==2.8.2",
     "ijson==3.1.4",
-    "tqdm == 4.60.0"
+    "tqdm == 4.60.0",
+]
 
+flame_reqs = [
+    "chumpy",
+    "pyrender==0.1.39",
+    "trimesh==3.6.18",
+    "smplx",
 ]
 
 dev_reqs = [
@@ -36,6 +42,7 @@ setup(
 
     install_requires=reqs,
     extras_require={
-        'dev': dev_reqs + reqs
+        'dev': dev_reqs + reqs,
+        'flame': flame_reqs + reqs,
     }
 )

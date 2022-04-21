@@ -1,3 +1,6 @@
 [submodule "data/datatool_api"]
 	path = data/datatool_api
 	url = git@gitlab.com:bonseyes/artifacts/data_tools/apis/datatool-api.git
+[submodule "flame_utils/FLAME_PyTorch_bonseyes"]
+	path = flame_utils/FLAME_PyTorch_bonseyes
+	url = git@github.com:david1309/FLAME_PyTorch_bonseyes.git

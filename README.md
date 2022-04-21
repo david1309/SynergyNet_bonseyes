@@ -33,10 +33,11 @@ Run the following commands to install requirements (the installation assumes you
 ```
 pip3 install torch torchvision --extra-index-url https://download.pytorch.org/whl/cu113
 
-pip install -e .
+pip install -e .[flame]
 ```
+In Ubuntu, you might need to additionally run: `apt-get install freeglut3-dev`, which is required by the submodule `FLAME_PyTorch _bonseyes` which uses *pyrender*.
 
-After this, place the BFM model *.mat* file inside `bfm_utils/morphable_models/` folder. Download the file from [here](https://drive.google.com/file/d/1V5UAwL8AB_dZoxn4HIUzBDEs4MVRZkPR/view?usp=sharing).
+After this, place the FLAME model files inside `flame_utils/FLAME_PyTorch_bonseyes/model` folder. You need the files: `generic_model.pkl`, `flame_dynamic_embedding.npy`,  `flame_static_embedding.pkl`. Get the first file from the [FLAME project webpage](https://flame.is.tue.mpg.de/download.php), downloading the file *FLAME 2020 (fixed mouth, improved expressions, more data)* (You need to sign up and agree to the model license for access to the mode). Download the other files from the [RingNet Project](https://github.com/soubhiksanyal/RingNet/tree/master/flame_model).
 
 
 
