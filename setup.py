@@ -8,6 +8,7 @@ reqs = [
     "opencv-python==4.5.5.64",
     "tensorboard==2.8.0",
 
+    "git-lfs",
     "python-dateutil==2.8.2",
     "ijson==3.1.4",
     "tqdm == 4.60.0",
@@ -18,6 +19,8 @@ flame_reqs = [
     "pyrender==0.1.39",
     "trimesh==3.6.18",
     "smplx",
+    "cython==0.29.21",
+    "werkzeug==1.0.1",
 ]
 
 dev_reqs = [

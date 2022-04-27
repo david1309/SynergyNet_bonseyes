@@ -4,3 +4,6 @@
 [submodule "flame_utils/FLAME_PyTorch_bonseyes"]
 	path = flame_utils/FLAME_PyTorch_bonseyes
 	url = git@github.com:david1309/FLAME_PyTorch_bonseyes.git
+[submodule "flame_utils/flame_fitting_bonseyes"]
+	path = flame_utils/flame_fitting_bonseyes
+	url = git@github.com:david1309/flame_fitting_bonseyes.git
