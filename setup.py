@@ -21,6 +21,7 @@ flame_reqs = [
     "smplx",
     "cython==0.29.21",
     "werkzeug==1.0.1",
+    "open3d",
 ]
 
 dev_reqs = [

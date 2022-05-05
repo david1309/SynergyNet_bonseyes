@@ -2,6 +2,7 @@
 # *scratch*
 ckpts*/*
 *mat
+saved_obj/
 
 # General
 .idea
