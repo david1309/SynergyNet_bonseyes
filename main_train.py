@@ -19,13 +19,21 @@ from utils.ddfa import str2bool, AverageMeter
 from utils.io import mkdir
 from model_building import SynergyNet as SynergyNet
 
-from data.dataloader_300wlp import dataset_from_datatool as dataset_from_datatool_300wlp
-from data.dataloader_AFLW2000 import dataset_from_datatool as dataset_from_datatool_AFLW2000
 
 from torch.utils.tensorboard import SummaryWriter
 from plot_results import plot_results
 from datetime import datetime
 
+# Data / Datatool dependencies
+import sys
+import yaml
+
+with open("data_config.yaml") as file: 
+    config = yaml.safe_load(file)
+sys.path.append(config["data_path"])
+
+from data.dataloader_300wlp import dataset_from_datatool as dataset_from_datatool_300wlp
+from data.dataloader_AFLW2000 import dataset_from_datatool as dataset_from_datatool_AFLW2000
 
 # global args (configuration)
 args = None # define the static training setting, which wouldn't and shouldn't be changed over the whole experiements.

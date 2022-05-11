@@ -10,7 +10,8 @@ reqs = [
 
     "python-dateutil==2.8.2",
     "ijson==3.1.4",
-    "tqdm == 4.60.0"
+    "tqdm == 4.60.0",
+    "PyYAML == 5.4.1",
 
 ]
 

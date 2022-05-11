@@ -12,23 +12,22 @@ An additional adaptation, is that training relies on using data coming from the 
 
 <img src='demo/teaser.png'>
 
-
+***
+***
 ## <div align="center"> Git cloning & Install Requirements</div>
-This repository relies in other submodules. Because of this, when cloning the repository please use the command:
+**Cloning and Data files:**
+***
+To clone the repository run:  `git clone https://github.com/david1309/SynergyNet_bonseyes`.
 
-`git clone --recurse-submodules https://github.com/david1309/SynergyNet_bonseyes` 
+Training relies on getting data via the Datatool API. For this you need to place under a folder called `data/` (this folder can be located inside the repo or anywhere in your system) the following files and repositories:
+* Dataloader files: copy all the files contained under `data_scripts/` inside your `data/` folder. To do this run:  `cp -r data_scripts/* <path_to_data_folder>`
+* Datatool API repo: clone into the `data/` folder the Datatool API repo, change its name, and clone it's submodules. To do this run:  `git clone --recurse-submodules https://gitlab.com/bonseyes/artifacts/data_tools/apis/datatool-api datatool_api` (you need to request access to Bonseyes in order to be able to clone).
 
-Alternatively use the normal clone command, and then update the submodules:
-```bash
-git clone https://github.com/david1309/SynergyNet_bonseyes
-git submodule init
-git submodule update
+Once this is done, open the `data_config.yaml` and modify the data path to point to your `data/` folder e.g. `data_path: <path_to_data_folder>`
 
-cd data/datatool_api/
-git submodule init
-git submodule update
-```
 
+**Installing requirements:**
+***
 Run the following commands to install requirements (the installation assumes your GPU runs in CUDA version 11.3. If your CUDA version is different, go to the Pytorch website and select another version):
 ```
 pip3 install torch torchvision --extra-index-url https://download.pytorch.org/whl/cu113
@@ -39,7 +38,8 @@ pip install -e .
 After this, place the BFM model *.mat* file inside `bfm_utils/morphable_models/` folder. Download the file from [here](https://drive.google.com/file/d/1V5UAwL8AB_dZoxn4HIUzBDEs4MVRZkPR/view?usp=sharing).
 
 
-
+***
+***
 ## <div align="center">Training</div>
 For easily training the model you can run the provided bash script using the command: `bash train_script.sh`.
 
@@ -59,7 +59,8 @@ You can also train the model using the command line and passing the desired argu
 python main_train.py  --datatool-root-dir="/root/output_debug_all_wv" --train-tags="IBUG" --val-tags="IBUG_Flip" --debug=True --exp-name="debug_cmd" --epochs=10 --batch-size=32
 ```
 
-
+***
+***
 **Bibtex**
 
 If you find our work useful, please consider to cite our work 
@@ -71,7 +72,8 @@ If you find our work useful, please consider to cite our work
       year={2021}
       }
 
-
+***
+***
 **Acknowledgement**
 
 The project is developed on [<a href="https://github.com/cleardusk/3DDFA">3DDFA</a>] and [<a href="https://github.com/shamangary/FSA-Net">FSA-Net</a>]. Thank them for their wonderful work. Thank [<a href="https://github.com/cleardusk/3DDFA_V2">3DDFA-V2</a>] for the face detector and rendering codes.

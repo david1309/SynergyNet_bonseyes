@@ -4,7 +4,7 @@
 #"IBUG,IBUG_Flip"
 
 python3 main_train.py \
-    --datatool-root-dir="/root/output_debug_all_wv" \
+    --datatool-root-dir="/root/datasets/output_debug_all_wv" \
     --train-tags="IBUG" \
     --val-tags="IBUG_Flip" \
     \

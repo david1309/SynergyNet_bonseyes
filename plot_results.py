@@ -13,8 +13,17 @@ import matplotlib.pyplot as plt
 
 from utils.plot import plotUtils
 from model_building import SynergyNet
-from data.dataloader_300wlp import dataset_from_datatool
 import time
+
+# Data / Datatool dependencies
+import sys
+import yaml
+
+with open("data_config.yaml") as file: 
+    config = yaml.safe_load(file)
+sys.path.append(config["data_path"])
+
+from data.dataloader_300wlp import dataset_from_datatool
 
 to_np = lambda tensor: tensor.detach().cpu().numpy()
 to_nps = lambda tensors: [to_np(t) for t in tensors]

@@ -1,3 +1,0 @@
-[submodule "data/datatool_api"]
-	path = data/datatool_api
-	url = git@gitlab.com:bonseyes/artifacts/data_tools/apis/datatool-api.git
