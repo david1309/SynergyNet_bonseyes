@@ -1,0 +1,14 @@
+# Personal
+*scratch*
+ckpts*/*
+*mat
+
+# General
+.idea
+.DS_Store
+.vscode/*
+runs/*
+**/__pycache__/
+__pycache__/
+venv
+*.tar
