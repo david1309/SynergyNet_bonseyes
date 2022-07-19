@@ -12,3 +12,4 @@ runs/*
 __pycache__/
 venv
 *.tar
+.da

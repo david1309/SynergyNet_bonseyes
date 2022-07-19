@@ -33,7 +33,7 @@ def main(args):
         model_dict[k.replace('module.', '')] = checkpoint[k]
 
     model.load_state_dict(model_dict, strict=False)
-    model = model.cuda()
+    model = model
     model.eval()
 
     # face detector
@@ -79,7 +79,7 @@ def main(args):
             
             input = transform(img).unsqueeze(0)
             with torch.no_grad():
-                input = input.cuda()
+                input = input
                 param = model.forward_test(input)
                 param = param.squeeze().cpu().numpy().flatten().astype(np.float32)
 

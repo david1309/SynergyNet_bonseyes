@@ -31,6 +31,8 @@ cfg = {
 render_app = RenderPipeline(**cfg)
 
 def render(img, ver_lst, alpha=0.6, wfp=None, tex=None, connectivity=None):
+    tri = sio.loadmat('./3dmm_data/tri.mat')['tri'] - 1
+    tri = _to_ctype(tri.T).astype(np.int32)
     # save solid mesh rendering and alpha overlaying on images
     if not connectivity is None:
         tri = _to_ctype(connectivity.T).astype(np.int32)

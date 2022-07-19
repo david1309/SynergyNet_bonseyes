@@ -9,6 +9,8 @@ from torchvision.transforms import ToPILImage
 from torch.utils.data import DataLoader
 from math import cos, sin, sqrt
 import cv2
+import matplotlib
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
 from utils.plot import plotUtils
